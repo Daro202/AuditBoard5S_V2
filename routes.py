@@ -61,16 +61,28 @@ def submit_audit():
         
         # Handle file upload
         photo_path = None
-        if 'photo' in request.files:
-            file = request.files['photo']
-            if file and file.filename and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                # Add timestamp to prevent filename conflicts
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                filename = timestamp + filename
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-                photo_path = f'uploads/{filename}'
+        try:
+            if 'photo' in request.files:
+                file = request.files['photo']
+                if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    # Add timestamp to prevent filename conflicts
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                    filename = timestamp + filename
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    
+                    # Ensure upload directory exists
+                    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                    
+                    # Save file
+                    file.save(file_path)
+                    photo_path = f'uploads/{filename}'
+                    app.logger.info(f"Photo saved successfully: {photo_path}")
+                else:
+                    app.logger.info("No valid photo file provided")
+        except Exception as e:
+            app.logger.error(f"Error saving photo: {str(e)}")
+            # Continue without photo - don't break the audit submission
         
         # Calculate audit sequence number for this machine
         machine_audit_count = Audit.query.filter_by(machine_id=session.machine_id).count()
@@ -290,16 +302,28 @@ def save_action():
         
         # Handle file upload for action photo
         zdjecie_dzialania = None
-        if 'zdjecie_dzialania' in request.files:
-            file = request.files['zdjecie_dzialania']
-            if file and file.filename and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                # Add timestamp to prevent filename conflicts
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                filename = f"action_{timestamp}{filename}"
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-                zdjecie_dzialania = f'uploads/{filename}'
+        try:
+            if 'zdjecie_dzialania' in request.files:
+                file = request.files['zdjecie_dzialania']
+                if file and file.filename and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    # Add timestamp to prevent filename conflicts
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                    filename = f"action_{timestamp}_{filename}"
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    
+                    # Ensure upload directory exists
+                    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                    
+                    # Save file
+                    file.save(file_path)
+                    zdjecie_dzialania = f'uploads/{filename}'
+                    app.logger.info(f"Action photo saved successfully: {zdjecie_dzialania}")
+                else:
+                    app.logger.info("No valid action photo file provided")
+        except Exception as e:
+            app.logger.error(f"Error saving action photo: {str(e)}")
+            # Continue without photo - don't break the action submission
         
         # Update audit record with action details
         audit.opis_dzialania = opis_dzialania
@@ -320,3 +344,12 @@ def save_action():
         db.session.rollback()
         app.logger.error(f"Error saving action: {str(e)}")
         return jsonify({'success': False, 'message': 'Wystąpił błąd podczas zapisywania działania.'})
+
+@app.route('/static/uploads/<filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    try:
+        return app.send_static_file(f'uploads/{filename}')
+    except Exception as e:
+        app.logger.error(f"Error serving file {filename}: {str(e)}")
+        return "File not found", 404

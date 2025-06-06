@@ -128,9 +128,11 @@
                                 <!-- Photo upload -->
                                 <div class="mb-3">
                                     <label for="photo" class="form-label">Zdjęcie dokumentujące</label>
-                                    <input type="file" class="form-control" id="photo" name="photo" accept="image/*">
+                                    <input type="file" class="form-control" id="photo" name="photo" 
+                                           accept="image/*" capture="environment">
                                     <div class="form-text">
-                                        Dozwolone formaty: JPG, PNG, GIF (max 16MB)
+                                        Dozwolone formaty: JPG, PNG, GIF (max 16MB)<br>
+                                        Na telefonie: dotknij aby zrobić zdjęcie aparatem
                                     </div>
                                 </div>
                             </div>

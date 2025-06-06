@@ -2,7 +2,7 @@ import pandas as pd
 import os
 from app import app
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'heic', 'heif'}
 
 def allowed_file(filename):
     """Check if uploaded file has allowed extension"""

@@ -286,8 +286,10 @@ function loadAuditDetails(machineId, auditSequence) {
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="zdjecie_dzialania" class="form-label">Zdjęcie działania</label>
-                                                <input type="file" class="form-control" id="zdjecie_dzialania" name="zdjecie_dzialania" accept="image/*">
-                                                <div class="form-text">Opcjonalne zdjęcie dokumentujące działanie</div>
+                                                <input type="file" class="form-control" id="zdjecie_dzialania" name="zdjecie_dzialania" 
+                                                       accept="image/*" capture="environment">
+                                                <div class="form-text">Opcjonalne zdjęcie dokumentujące działanie<br>
+                                                Na telefonie: dotknij aby zrobić zdjęcie aparatem</div>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
