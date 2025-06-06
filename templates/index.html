@@ -198,7 +198,7 @@
 </div>
 
 <script>
-// Enhanced file selection handler for mobile devices
+// Enhanced file selection handler for all mobile devices
 function fileSelected(input) {
     const file = input.files[0];
     if (file) {
@@ -209,14 +209,15 @@ function fileSelected(input) {
         const info = 'Plik: ' + file.name + '\nRozmiar: ' + (sizeMB > 0 ? sizeMB + 'MB' : sizeKB + 'KB') + '\nTyp: ' + file.type;
         alert(info);
         
-        // For iOS devices, convert to Base64 and add to hidden field
-        if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+        // Convert to Base64 for ALL mobile devices (iOS, Android, etc.)
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
             convertToBase64(file);
         }
     }
 }
 
-// Convert file to Base64 for iOS compatibility
+// Convert file to Base64 for mobile compatibility
 function convertToBase64(file) {
     const reader = new FileReader();
     reader.onload = function(e) {
@@ -244,6 +245,12 @@ function convertToBase64(file) {
         filenameInput.value = file.name;
         
         alert('Zdjęcie przygotowane do wysłania (Base64)');
+        
+        // Clear the original file input to prevent conflicts
+        const photoInput = document.getElementById('photo');
+        if (photoInput) {
+            photoInput.value = '';
+        }
     };
     reader.readAsDataURL(file);
 }
@@ -296,17 +303,33 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Debug form submission
+    // Debug form submission with alert for mobile debugging
     const auditForm = document.querySelector('form[action="/submit_audit"]');
     if (auditForm) {
         auditForm.addEventListener('submit', function(e) {
             const formData = new FormData(this);
             const file = formData.get('photo');
+            const base64Data = formData.get('photo_base64');
+            const base64Filename = formData.get('photo_filename');
+            
+            // Show detailed debug info with alert for mobile
+            const debugInfo = 'Form submission debug:\n' +
+                'Has file: ' + (!!file) + '\n' +
+                'File name: ' + (file ? file.name : 'none') + '\n' +
+                'File size: ' + (file ? file.size : 0) + '\n' +
+                'Has Base64: ' + (!!base64Data) + '\n' +
+                'Base64 filename: ' + (base64Filename || 'none') + '\n' +
+                'Base64 size: ' + (base64Data ? base64Data.length : 0);
+            
+            alert(debugInfo);
             
             console.log('Form submission:', {
                 hasFile: !!file,
                 fileName: file ? file.name : 'none',
                 fileSize: file ? file.size : 0,
+                hasBase64: !!base64Data,
+                base64Filename: base64Filename,
+                base64Size: base64Data ? base64Data.length : 0,
                 formEntries: Array.from(formData.entries()).map(([k, v]) => [k, v instanceof File ? `File: ${v.name}` : v])
             });
         });
