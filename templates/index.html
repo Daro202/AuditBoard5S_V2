@@ -209,11 +209,43 @@ function fileSelected(input) {
         const info = 'Plik: ' + file.name + '\nRozmiar: ' + (sizeMB > 0 ? sizeMB + 'MB' : sizeKB + 'KB') + '\nTyp: ' + file.type;
         alert(info);
         
-        // Check if it's iOS HEIC format and convert if needed
-        if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
-            alert('Format HEIC wykryty - zostanie przekonwertowany do JPEG');
+        // For iOS devices, convert to Base64 and add to hidden field
+        if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+            convertToBase64(file);
         }
     }
+}
+
+// Convert file to Base64 for iOS compatibility
+function convertToBase64(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // Create hidden input with Base64 data
+        let hiddenInput = document.getElementById('photo_base64');
+        if (!hiddenInput) {
+            hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'photo_base64';
+            hiddenInput.id = 'photo_base64';
+            document.querySelector('form[action="/submit_audit"]').appendChild(hiddenInput);
+        }
+        
+        // Also store filename
+        let filenameInput = document.getElementById('photo_filename');
+        if (!filenameInput) {
+            filenameInput = document.createElement('input');
+            filenameInput.type = 'hidden';
+            filenameInput.name = 'photo_filename';
+            filenameInput.id = 'photo_filename';
+            document.querySelector('form[action="/submit_audit"]').appendChild(filenameInput);
+        }
+        
+        hiddenInput.value = e.target.result;
+        filenameInput.value = file.name;
+        
+        alert('Zdjęcie przygotowane do wysłania (Base64)');
+    };
+    reader.readAsDataURL(file);
 }
 
 // Update form labels based on status selection

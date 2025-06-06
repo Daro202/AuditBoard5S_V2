@@ -9,6 +9,7 @@ from datetime import datetime
 from PIL import Image
 import pillow_heif
 import io
+import base64
 
 # Register HEIF opener with Pillow
 pillow_heif.register_heif_opener()
@@ -110,9 +111,14 @@ def submit_audit():
         # Force flush debug logs immediately
         app.logger.info(f"Processing upload - files: {list(request.files.keys())}")
         
-        # Check if we have ANY file at all
-        if 'photo' not in request.files:
-            app.logger.warning("No 'photo' field in request.files")
+        # Check for Base64 data (iOS fallback) or regular file upload
+        photo_base64 = request.form.get('photo_base64')
+        photo_filename = request.form.get('photo_filename')
+        
+        if photo_base64 and photo_filename:
+            app.logger.info(f"Base64 photo received: {photo_filename}")
+        elif 'photo' not in request.files:
+            app.logger.warning("No 'photo' field in request.files and no Base64 data")
         else:
             file = request.files['photo']
             if not file or not file.filename:
@@ -125,9 +131,50 @@ def submit_audit():
             with open('/tmp/upload_debug.log', 'a') as debug_file:
                 debug_file.write(f"\n=== Upload Debug {datetime.now()} ===\n")
                 debug_file.write(f"Request files: {list(request.files.keys())}\n")
-                debug_file.write(f"Request form: {dict(request.form)}\n")
+                debug_file.write(f"Request form keys: {list(request.form.keys())}\n")
+                debug_file.write(f"Has Base64: {'photo_base64' in request.form}\n")
+                debug_file.write(f"Has filename: {'photo_filename' in request.form}\n")
                 
-                if 'photo' in request.files:
+                # Handle Base64 upload (iOS devices)
+                if photo_base64 and photo_filename:
+                    debug_file.write(f"Processing Base64 upload: {photo_filename}\n")
+                    try:
+                        # Decode Base64 data
+                        header, data = photo_base64.split(',', 1)
+                        image_data = base64.b64decode(data)
+                        
+                        # Create file-like object
+                        file_buffer = io.BytesIO(image_data)
+                        
+                        # Process like regular file
+                        if allowed_file(photo_filename):
+                            filename = secure_filename(photo_filename)
+                            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                            filename = timestamp + filename
+                            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                            
+                            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                            
+                            # Save Base64 decoded file
+                            with open(file_path, 'wb') as f:
+                                f.write(image_data)
+                            
+                            debug_file.write(f"Base64 file saved to: {file_path}\n")
+                            
+                            if os.path.exists(file_path):
+                                file_size = os.path.getsize(file_path)
+                                photo_path = f'uploads/{filename}'
+                                debug_file.write(f"Base64 photo saved successfully: {photo_path}, size: {file_size} bytes\n")
+                                app.logger.info(f"Base64 photo saved successfully: {photo_path}")
+                            else:
+                                debug_file.write(f"ERROR: Base64 file was not saved\n")
+                        else:
+                            debug_file.write(f"Base64 file extension not allowed: {photo_filename}\n")
+                    except Exception as e:
+                        debug_file.write(f"Base64 processing error: {str(e)}\n")
+                        app.logger.error(f"Base64 processing error: {str(e)}")
+                
+                elif 'photo' in request.files:
                     file = request.files['photo']
                     debug_file.write(f"File object: {file}\n")
                     debug_file.write(f"Filename: {file.filename}\n")
