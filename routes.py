@@ -499,6 +499,52 @@ def save_action():
         app.logger.error(f"Error saving action: {str(e)}")
         return jsonify({'success': False, 'message': 'Wystąpił błąd podczas zapisywania działania.'})
 
+@app.route('/submit_audit_mobile', methods=['POST'])
+def submit_audit_mobile():
+    """Mobile-specific audit submission without file upload issues"""
+    app.logger.critical("=== MOBILE AUDIT ENDPOINT CALLED ===")
+    print("=== MOBILE AUDIT ENDPOINT CALLED ===")
+    
+    try:
+        session_id = request.form.get('session_id')
+        status = request.form.get('status')
+        description = request.form.get('description')
+        auditor_name = request.form.get('auditor_name', '')
+        action_completed = request.form.get('action_completed') == 'on'
+        
+        if not all([session_id, status, description]):
+            return jsonify({'error': 'Wszystkie pola są wymagane.'}), 400
+        
+        session = AuditSession.query.get(session_id)
+        if not session or session.used:
+            return jsonify({'error': 'Nieprawidłowa sesja audytu.'}), 400
+        
+        machine_audit_count = Audit.query.filter_by(machine_id=session.machine_id).count()
+        audit_sequence = machine_audit_count + 1
+        
+        audit = Audit()
+        audit.machine_id = session.machine_id
+        audit.question_id = session.question_id
+        audit.status = status
+        audit.description = description
+        audit.photo_path = None
+        audit.auditor_name = auditor_name
+        audit.action_completed = action_completed
+        audit.audit_sequence = audit_sequence
+        
+        session.used = True
+        
+        db.session.add(audit)
+        db.session.commit()
+        
+        app.logger.info(f"Mobile audit saved: ID {audit.id}")
+        return jsonify({'success': True, 'message': 'Audyt zapisany pomyślnie.'})
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Mobile audit error: {str(e)}")
+        return jsonify({'error': 'Błąd podczas zapisywania.'}), 500
+
 @app.route('/static/uploads/<filename>')
 def uploaded_file(filename):
     """Serve uploaded files"""
