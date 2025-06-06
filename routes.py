@@ -56,6 +56,7 @@ def submit_audit():
             f.write(f"Request files: {list(request.files.keys())}\n")
             f.write(f"Request form: {dict(request.form)}\n")
             f.write(f"Content type: {request.content_type}\n")
+            f.write(f"Content length: {request.content_length}\n")
         session_id = request.form.get('session_id')
         status = request.form.get('status')
         description = request.form.get('description')
@@ -75,6 +76,20 @@ def submit_audit():
         
         # Handle file upload
         photo_path = None
+        
+        # Force flush debug logs immediately
+        app.logger.info(f"Processing upload - files: {list(request.files.keys())}")
+        
+        # Check if we have ANY file at all
+        if 'photo' not in request.files:
+            app.logger.warning("No 'photo' field in request.files")
+        else:
+            file = request.files['photo']
+            if not file or not file.filename:
+                app.logger.warning(f"Empty file or no filename: {file}")
+            else:
+                app.logger.info(f"File received: {file.filename}, size: {file.content_length}")
+        
         try:
             # Debug logging to file
             with open('/tmp/upload_debug.log', 'a') as debug_file:
@@ -123,6 +138,7 @@ def submit_audit():
                             else:
                                 debug_file.write(f"ERROR: File was not saved to {file_path}\n")
                                 app.logger.error(f"File was not saved to {file_path}")
+                                photo_path = None  # Don't save path to DB if file doesn't exist
                         else:
                             debug_file.write(f"File extension not allowed: {file.filename}\n")
                             app.logger.warning(f"File extension not allowed: {file.filename}")
