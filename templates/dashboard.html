@@ -256,14 +256,14 @@ function loadAuditDetails(machineId, auditSequence) {
                             
                             ${data.opis_dzialania ? `
                                 <!-- Istniejące działanie -->
-                                <div class="card bg-light mb-3">
+                                <div class="card bg-secondary mb-3">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <h6 class="card-title">Zapisane działanie naprawcze</h6>
+                                            <h6 class="card-title text-white">Zapisane działanie naprawcze</h6>
                                             ${dzialanieBadge}
                                         </div>
-                                        <p class="card-text">${data.opis_dzialania}</p>
-                                        ${data.data_dzialania ? `<small class="text-muted">Data wykonania: ${data.data_dzialania}</small>` : ''}
+                                        <p class="card-text text-white">${data.opis_dzialania}</p>
+                                        ${data.data_dzialania ? `<small class="text-light">Data wykonania: ${data.data_dzialania}</small>` : ''}
                                         ${data.zdjecie_dzialania ? `
                                             <div class="mt-2">
                                                 <img src="/static/${data.zdjecie_dzialania}" class="img-fluid rounded" style="max-height: 200px;" alt="Zdjęcie działania">
