@@ -42,6 +42,20 @@ def index():
 def submit_audit():
     """Submit audit result"""
     try:
+        # Immediate debug logging
+        print(f"=== SUBMIT_AUDIT DEBUG ===")
+        print(f"Request method: {request.method}")
+        print(f"Request files: {list(request.files.keys())}")
+        print(f"Request form: {dict(request.form)}")
+        print(f"Content type: {request.content_type}")
+        
+        # Also log to file for persistence
+        with open('/tmp/submit_debug.log', 'a') as f:
+            f.write(f"\n=== SUBMIT_AUDIT {datetime.now()} ===\n")
+            f.write(f"Request method: {request.method}\n")
+            f.write(f"Request files: {list(request.files.keys())}\n")
+            f.write(f"Request form: {dict(request.form)}\n")
+            f.write(f"Content type: {request.content_type}\n")
         session_id = request.form.get('session_id')
         status = request.form.get('status')
         description = request.form.get('description')
