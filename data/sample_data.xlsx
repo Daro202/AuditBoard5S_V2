@@ -1,0 +1,5 @@
+# Note: This would be an actual Excel file, but since we cannot generate binary files,
+# this file should be created using the create_sample_excel() function in utils.py
+# The file contains two sheets:
+# Sheet 1 "Maszyny": Column with machine names (MARTIN, JUMBO, DOMINO, HEIDELBERG, KOLBUS)
+# Sheet 2 "Pytania": Two columns - code and description with 5S audit questions

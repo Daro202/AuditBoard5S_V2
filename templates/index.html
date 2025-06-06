@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Audyt 5S - Formularz{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-clipboard-check me-2"></i>
+                    Formularz Audytu 5S
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if no_data %}
+                    <!-- No data state -->
+                    <div class="text-center py-5">
+                        <i class="fas fa-database fa-3x text-muted mb-3"></i>
+                        <h4 class="text-muted">Brak danych w systemie</h4>
+                        <p class="text-muted mb-4">Aby rozpocząć audyt, należy wczytać dane z pliku Excel.</p>
+                        
+                        <form method="POST" action="{{ url_for('upload_excel') }}" enctype="multipart/form-data" class="d-inline">
+                            <div class="mb-3">
+                                <label for="excel_file" class="form-label">Wybierz plik Excel z danymi:</label>
+                                <input type="file" class="form-control" id="excel_file" name="excel_file" accept=".xlsx,.xls" required>
+                                <div class="form-text">
+                                    Plik powinien zawierać 2 arkusze: pierwszy z maszynami, drugi z pytaniami (kod, opis).
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload me-1"></i>
+                                Wczytaj dane
+                            </button>
+                        </form>
+                    </div>
+                    
+                {% elif completed %}
+                    <!-- All audits completed -->
+                    <div class="text-center py-5">
+                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <h4 class="text-success">Wszystkie audyty zostały ukończone!</h4>
+                        <p class="text-muted mb-4">Wszystkie pary maszyna-pytanie zostały już sprawdzone.</p>
+                        
+                        <div class="btn-group" role="group">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                                <i class="fas fa-chart-line me-1"></i>
+                                Zobacz wyniki
+                            </a>
+                            <a href="{{ url_for('reset_session') }}" class="btn btn-secondary">
+                                <i class="fas fa-redo me-1"></i>
+                                Rozpocznij nową sesję
+                            </a>
+                        </div>
+                    </div>
+                    
+                {% else %}
+                    <!-- Active audit form -->
+                    <div class="audit-card mb-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="info-box bg-info text-white p-3 rounded">
+                                    <h5>
+                                        <i class="fas fa-cog me-2"></i>
+                                        Maszyna
+                                    </h5>
+                                    <h4 class="fw-bold">{{ machine.name }}</h4>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="info-box bg-warning text-dark p-3 rounded">
+                                    <h5>
+                                        <i class="fas fa-question-circle me-2"></i>
+                                        Pytanie: {{ question.code }}
+                                    </h5>
+                                    <p class="mb-0">{{ question.description }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Audit form -->
+                    <form method="POST" action="{{ url_for('submit_audit') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="session_id" value="{{ session_id }}">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <!-- Status selection -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Status audytu *</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <input type="radio" class="btn-check" name="status" id="status_ok" value="OK" required>
+                                        <label class="btn btn-outline-success" for="status_ok">
+                                            <i class="fas fa-check me-1"></i>
+                                            OK
+                                        </label>
+                                        
+                                        <input type="radio" class="btn-check" name="status" id="status_nie" value="NIE" required>
+                                        <label class="btn btn-outline-danger" for="status_nie">
+                                            <i class="fas fa-times me-1"></i>
+                                            NIE
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Auditor name -->
+                                <div class="mb-3">
+                                    <label for="auditor_name" class="form-label">Imię audytora</label>
+                                    <input type="text" class="form-control" id="auditor_name" name="auditor_name" placeholder="Opcjonalne">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <!-- Photo upload -->
+                                <div class="mb-3">
+                                    <label for="photo" class="form-label">Zdjęcie dokumentujące</label>
+                                    <input type="file" class="form-control" id="photo" name="photo" accept="image/*">
+                                    <div class="form-text">
+                                        Dozwolone formaty: JPG, PNG, GIF (max 16MB)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-4">
+                            <label for="description" class="form-label fw-bold">
+                                <span id="description-label">Opis *</span>
+                            </label>
+                            <textarea class="form-control" id="description" name="description" rows="4" required 
+                                placeholder="Opisz stan maszyny..."></textarea>
+                        </div>
+
+                        <!-- Submit buttons -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-1"></i>
+                                Zapisz audyt
+                            </button>
+                        </div>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tools section -->
+        {% if not no_data and not completed %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-tools me-2"></i>
+                    Narzędzia
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-chart-line me-1"></i>
+                        Tablica audytowa
+                    </a>
+                    <a href="{{ url_for('reset_session') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-redo me-1"></i>
+                        Reset sesji
+                    </a>
+                </div>
+                
+                <!-- Excel upload for data update -->
+                <hr>
+                <form method="POST" action="{{ url_for('upload_excel') }}" enctype="multipart/form-data" class="d-inline">
+                    <div class="input-group">
+                        <input type="file" class="form-control" name="excel_file" accept=".xlsx,.xls">
+                        <button type="submit" class="btn btn-outline-info">
+                            <i class="fas fa-upload me-1"></i>
+                            Aktualizuj dane
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Update form labels based on status selection
+document.addEventListener('DOMContentLoaded', function() {
+    const statusRadios = document.querySelectorAll('input[name="status"]');
+    const descriptionLabel = document.getElementById('description-label');
+    const descriptionTextarea = document.getElementById('description');
+    
+    statusRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'OK') {
+                descriptionLabel.textContent = 'Opis zgodności *';
+                descriptionTextarea.placeholder = 'Opisz potwierdzenie stanu OK...';
+            } else {
+                descriptionLabel.textContent = 'Opis problemu *';
+                descriptionTextarea.placeholder = 'Opisz wykrytą niezgodność...';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
