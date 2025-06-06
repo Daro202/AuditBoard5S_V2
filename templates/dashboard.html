@@ -75,7 +75,12 @@
                                     <div class="audit-status-indicator {{ 'status-ok' if audit.status == 'OK' else 'status-nok' }}"
                                          data-bs-toggle="tooltip" 
                                          data-bs-placement="top"
-                                         title="Kliknij aby zobaczyć szczegóły">
+                                         data-bs-html="true"
+                                         title="<strong>{{ audit.status }}</strong><br/>
+                                                Audyt: {{ audit.created_at.strftime('%d.%m %H:%M') }}<br/>
+                                                {% if audit.opis_dzialania %}Działanie: {{ audit.data_dzialania.strftime('%d.%m %H:%M') if audit.data_dzialania else 'Brak daty' }}<br/>
+                                                {{ audit.opis_dzialania[:50] }}...{% endif %}
+                                                <br/><em>Kliknij aby zobaczyć szczegóły</em>">
                                         {% if audit.status == 'OK' %}
                                             <i class="fas fa-check"></i>
                                         {% else %}
@@ -84,6 +89,11 @@
                                         <small class="d-block mt-1">
                                             {{ audit.created_at.strftime('%m/%d') }}
                                         </small>
+                                        {% if audit.opis_dzialania %}
+                                            <small class="d-block text-warning" style="font-size: 0.65rem;">
+                                                <i class="fas fa-tools"></i> {{ audit.data_dzialania.strftime('%m/%d') if audit.data_dzialania else '' }}
+                                            </small>
+                                        {% endif %}
                                         
                                         <!-- Green square for completed action -->
                                         {% if audit.dzialanie_ok %}
