@@ -129,7 +129,7 @@
                                 <div class="mb-3">
                                     <label for="photo" class="form-label">Zdjęcie dokumentujące</label>
                                     <input type="file" class="form-control" id="photo" name="photo" 
-                                           accept="image/*" capture="environment">
+                                           accept="image/*" capture="environment" onchange="fileSelected(this)">
                                     <div class="form-text">
                                         Dozwolone formaty: JPG, PNG, GIF (max 32MB)<br>
                                         Na telefonie: dotknij aby zrobić zdjęcie aparatem
@@ -198,6 +198,14 @@
 </div>
 
 <script>
+// Simple file selection handler
+function fileSelected(input) {
+    const file = input.files[0];
+    if (file) {
+        alert('Plik wybrany: ' + file.name + ' (' + Math.round(file.size/1024) + 'KB)');
+    }
+}
+
 // Update form labels based on status selection
 document.addEventListener('DOMContentLoaded', function() {
     const statusRadios = document.querySelectorAll('input[name="status"]');
@@ -240,16 +248,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                // Debug log to help identify issues
-                fetch('/debug_upload', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        filename: file.name,
-                        size: file.size,
-                        type: file.type
-                    })
-                }).catch(err => console.log('Debug log failed:', err));
+                // Simple alert for mobile debugging
+                alert('Plik wybrany: ' + file.name + ' (' + Math.round(file.size/1024) + 'KB)');
             }
         });
     }
