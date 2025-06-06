@@ -335,57 +335,51 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // AJAX submit function for mobile devices
-    window.forceSubmit = function(event) {
-        event.preventDefault();
-        
-        const form = document.querySelector('form[action="/submit_audit"]');
-        if (!form) {
-            alert('Błąd: nie znaleziono formularza');
-            return;
-        }
-        
-        // Check required fields
-        const status = form.querySelector('input[name="status"]:checked');
-        const description = form.querySelector('textarea[name="description"]');
-        
-        if (!status) {
-            alert('Wybierz status audytu (OK/NOK)');
-            return;
-        }
-        
-        if (!description || !description.value.trim()) {
-            alert('Wprowadź opis audytu');
-            return;
-        }
-        
-        // Show submission alert
-        alert('Wysyłanie przez AJAX...');
-        
-        // Prepare form data
-        const formData = new FormData(form);
-        
-        // Use mobile endpoint for better compatibility
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const endpoint = isMobile ? '/submit_audit_mobile' : '/submit_audit';
-        
-        // Send AJAX request
-        fetch(endpoint, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                alert('Audyt zapisany pomyślnie!');
-                window.location.href = '/';
-            } else {
-                alert('Błąd podczas zapisywania audytu');
+    // Assign submit handler to form
+    if (auditForm) {
+        auditForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            // Check required fields
+            const status = this.querySelector('input[name="status"]:checked');
+            const description = this.querySelector('textarea[name="description"]');
+            
+            if (!status) {
+                alert('Wybierz status audytu (OK/NOK)');
+                return;
             }
-        })
-        .catch(error => {
-            alert('Błąd sieci: ' + error.message);
+            
+            if (!description || !description.value.trim()) {
+                alert('Wprowadź opis audytu');
+                return;
+            }
+            
+            // Show submission alert
+            alert('Zapisywanie audytu...');
+            
+            // Prepare form data
+            const formData = new FormData(this);
+            
+            // Always use standard submit_audit endpoint
+            fetch('/submit_audit', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Audyt zapisany pomyślnie!');
+                    window.location.href = '/';
+                } else {
+                    alert('Błąd podczas zapisywania audytu');
+                }
+            })
+            .catch(error => {
+                alert('Błąd sieci: ' + error.message);
+                // Fallback: try standard form submission
+                this.submit();
+            });
         });
-    };
+    }
 });
 </script>
 {% endblock %}

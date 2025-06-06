@@ -637,9 +637,10 @@ def uploaded_file(filename):
     try:
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         if os.path.exists(file_path):
-            return app.send_static_file(f'uploads/{filename}')
+            from flask import send_from_directory
+            return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
         else:
-            app.logger.error(f"File not found: {file_path}")
+            app.logger.error(f"File not found: static/uploads/{filename}")
             return "File not found", 404
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
