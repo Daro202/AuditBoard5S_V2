@@ -263,5 +263,60 @@ def get_audit_data(machine_id, audit_sequence):
         'photo_path': audit.photo_path,
         'action_completed': audit.action_completed,
         'question_code': question.code if question else 'N/A',
-        'question_description': question.description if question else 'N/A'
+        'question_description': question.description if question else 'N/A',
+        'audit_id': audit.id,
+        'opis_dzialania': audit.opis_dzialania,
+        'zdjecie_dzialania': audit.zdjecie_dzialania,
+        'dzialanie_ok': audit.dzialanie_ok,
+        'data_dzialania': audit.data_dzialania.strftime('%Y-%m-%d %H:%M') if audit.data_dzialania else None
     })
+
+@app.route('/save_action', methods=['POST'])
+def save_action():
+    """Zapisz działanie naprawcze dla audytu"""
+    try:
+        audit_id = request.form.get('audit_id')
+        opis_dzialania = request.form.get('opis_dzialania')
+        dzialanie_ok = request.form.get('dzialanie_ok') == 'on'
+        
+        # Validate required fields
+        if not all([audit_id, opis_dzialania]):
+            return jsonify({'success': False, 'message': 'Wszystkie pola są wymagane.'})
+        
+        # Get the audit
+        audit = Audit.query.get(audit_id)
+        if not audit:
+            return jsonify({'success': False, 'message': 'Nieprawidłowy audyt.'})
+        
+        # Handle file upload for action photo
+        zdjecie_dzialania = None
+        if 'zdjecie_dzialania' in request.files:
+            file = request.files['zdjecie_dzialania']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                # Add timestamp to prevent filename conflicts
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                filename = f"action_{timestamp}{filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                zdjecie_dzialania = f'uploads/{filename}'
+        
+        # Update audit record with action details
+        audit.opis_dzialania = opis_dzialania
+        audit.zdjecie_dzialania = zdjecie_dzialania
+        audit.dzialanie_ok = dzialanie_ok
+        audit.data_dzialania = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Działanie naprawcze zostało zapisane pomyślnie.',
+            'data_dzialania': audit.data_dzialania.strftime('%Y-%m-%d %H:%M'),
+            'dzialanie_ok': dzialanie_ok
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error saving action: {str(e)}")
+        return jsonify({'success': False, 'message': 'Wystąpił błąd podczas zapisywania działania.'})

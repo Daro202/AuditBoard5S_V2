@@ -86,7 +86,7 @@
                                         </small>
                                         
                                         <!-- Green square for completed action -->
-                                        {% if audit.action_completed %}
+                                        {% if audit.dzialanie_ok %}
                                             <div class="action-completed-indicator">
                                                 <i class="fas fa-check-double"></i>
                                             </div>
@@ -204,10 +204,14 @@ function loadAuditDetails(machineId, auditSequence) {
                     ? '<span class="badge bg-info ms-2"><i class="fas fa-check-double me-1"></i>Działanie zakończone pozytywnie</span>'
                     : '';
                 
+                const dzialanieBadge = data.dzialanie_ok 
+                    ? '<span class="badge bg-success ms-2"><i class="fas fa-check-double me-1"></i>Działanie naprawcze zakończone pozytywnie</span>'
+                    : '';
+                
                 content = `
                     <div class="row">
                         <div class="col-md-6">
-                            <h6>Status:</h6>
+                            <h6>Status audytu:</h6>
                             <p>${statusBadge}${actionBadge}</p>
                             
                             <h6>Pytanie audytowe:</h6>
@@ -220,13 +224,83 @@ function loadAuditDetails(machineId, auditSequence) {
                             <p>${data.date}</p>
                         </div>
                         <div class="col-md-6">
-                            <h6>Opis:</h6>
+                            <h6>Opis audytu:</h6>
                             <p>${data.description}</p>
                             
                             ${data.photo_path ? `
-                                <h6>Zdjęcie:</h6>
-                                <img src="/static/${data.photo_path}" class="img-fluid rounded" alt="Zdjęcie audytu">
-                            ` : '<p class="text-muted"><i>Brak zdjęcia</i></p>'}
+                                <h6>Zdjęcie audytu:</h6>
+                                <img src="/static/${data.photo_path}" class="img-fluid rounded mb-3" alt="Zdjęcie audytu">
+                            ` : '<p class="text-muted mb-3"><i>Brak zdjęcia audytu</i></p>'}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- Sekcja działań naprawczych -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-tools me-2"></i>
+                                Działania naprawcze
+                            </h5>
+                            
+                            ${data.opis_dzialania ? `
+                                <!-- Istniejące działanie -->
+                                <div class="card bg-light mb-3">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h6 class="card-title">Zapisane działanie naprawcze</h6>
+                                            ${dzialanieBadge}
+                                        </div>
+                                        <p class="card-text">${data.opis_dzialania}</p>
+                                        ${data.data_dzialania ? `<small class="text-muted">Data wykonania: ${data.data_dzialania}</small>` : ''}
+                                        ${data.zdjecie_dzialania ? `
+                                            <div class="mt-2">
+                                                <img src="/static/${data.zdjecie_dzialania}" class="img-fluid rounded" style="max-height: 200px;" alt="Zdjęcie działania">
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            ` : `
+                                <!-- Formularz dodawania działania -->
+                                <form id="actionForm" enctype="multipart/form-data">
+                                    <input type="hidden" name="audit_id" value="${data.audit_id}">
+                                    
+                                    <div class="mb-3">
+                                        <label for="opis_dzialania" class="form-label fw-bold">Opis działania naprawczego *</label>
+                                        <textarea class="form-control" id="opis_dzialania" name="opis_dzialania" rows="3" 
+                                            placeholder="Opisz podjęte działania naprawcze..." required></textarea>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="zdjecie_dzialania" class="form-label">Zdjęcie działania</label>
+                                                <input type="file" class="form-control" id="zdjecie_dzialania" name="zdjecie_dzialania" accept="image/*">
+                                                <div class="form-text">Opcjonalne zdjęcie dokumentujące działanie</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <div class="form-check mt-4">
+                                                    <input class="form-check-input" type="checkbox" name="dzialanie_ok" id="dzialanie_ok">
+                                                    <label class="form-check-label fw-bold text-success" for="dzialanie_ok">
+                                                        <i class="fas fa-check-double me-1"></i>
+                                                        Działanie zakończone pozytywnie
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-1"></i>
+                                            Zapisz działania
+                                        </button>
+                                    </div>
+                                </form>
+                            `}
                         </div>
                     </div>
                 `;

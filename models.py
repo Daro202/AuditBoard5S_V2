@@ -40,8 +40,14 @@ class Audit(db.Model):
     action_completed = db.Column(db.Boolean, default=False)  # Czy działanie zostało zakończone pozytywnie
     audit_sequence = db.Column(db.Integer, nullable=True)  # Kolejny numer audytu dla danej maszyny
     
+    # Pola działań naprawczych
+    opis_dzialania = db.Column(db.Text, nullable=True)
+    zdjecie_dzialania = db.Column(db.String(255), nullable=True)
+    dzialanie_ok = db.Column(db.Boolean, default=False)
+    data_dzialania = db.Column(db.DateTime, nullable=True)
+    
     def __repr__(self):
-        return f'<Audit {self.machine.name} - {self.question.code} - {self.status}>'
+        return f'<Audit {self.id} - {self.status}>'
 
 class AuditSession(db.Model):
     """Model to track audit sessions and prevent repetitions"""
