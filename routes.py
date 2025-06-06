@@ -526,12 +526,36 @@ def submit_audit_mobile():
         machine_audit_count = Audit.query.filter_by(machine_id=session.machine_id).count()
         audit_sequence = machine_audit_count + 1
         
+        # Handle photo upload to Cloudinary
+        photo_path = None
+        photo_base64 = request.form.get('photo_base64')
+        photo_filename = request.form.get('photo_filename')
+        
+        if photo_base64 and photo_filename:
+            try:
+                # Decode Base64 data
+                if ',' in photo_base64:
+                    header, data = photo_base64.split(',', 1)
+                else:
+                    data = photo_base64
+                
+                image_data = base64.b64decode(data)
+                image_buffer = io.BytesIO(image_data)
+                
+                # Upload to Cloudinary
+                cloudinary_url = upload_to_cloudinary(image_buffer, photo_filename)
+                if cloudinary_url:
+                    photo_path = cloudinary_url
+                    app.logger.info(f"Mobile photo uploaded to Cloudinary: {photo_path}")
+            except Exception as e:
+                app.logger.error(f"Mobile photo upload error: {str(e)}")
+        
         audit = Audit()
         audit.machine_id = session.machine_id
         audit.question_id = session.question_id
         audit.status = status
         audit.description = description
-        audit.photo_path = None
+        audit.photo_path = photo_path
         audit.auditor_name = auditor_name
         audit.action_completed = action_completed
         audit.audit_sequence = audit_sequence
@@ -542,12 +566,35 @@ def submit_audit_mobile():
         db.session.commit()
         
         app.logger.info(f"Mobile audit saved: ID {audit.id}")
-        return jsonify({'success': True, 'message': 'Audyt zapisany pomyślnie.'})
+        return jsonify({'success': True, 'message': 'Audyt zapisany pomyślnie.', 'photo_url': photo_path})
         
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Mobile audit error: {str(e)}")
         return jsonify({'error': 'Błąd podczas zapisywania.'}), 500
+
+@app.route('/upload_cloudinary', methods=['POST'])
+def upload_cloudinary():
+    """Direct photo upload to Cloudinary"""
+    try:
+        if 'photo' not in request.files:
+            return jsonify({'error': 'Brak pliku'}), 400
+        
+        file = request.files['photo']
+        if file.filename == '':
+            return jsonify({'error': 'Nie wybrano pliku'}), 400
+        
+        # Upload to Cloudinary
+        cloudinary_url = upload_to_cloudinary(file, file.filename)
+        
+        if cloudinary_url:
+            return jsonify({'success': True, 'url': cloudinary_url})
+        else:
+            return jsonify({'error': 'Błąd uploadowania'}), 500
+            
+    except Exception as e:
+        app.logger.error(f"Direct upload error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/static/uploads/<filename>')
 def uploaded_file(filename):
