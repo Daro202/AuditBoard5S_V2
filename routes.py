@@ -105,8 +105,12 @@ def submit_audit():
             flash('Nieprawidłowa sesja audytu.', 'error')
             return redirect(url_for('index'))
         
-        # Handle file upload
+        # Handle file upload - CRITICAL DEBUG
         photo_path = None
+        
+        print(f"=== UPLOAD PROCESSING DEBUG ===")
+        print(f"Files: {list(request.files.keys())}")
+        print(f"Form keys: {list(request.form.keys())}")
         
         # Force flush debug logs immediately
         app.logger.info(f"Processing upload - files: {list(request.files.keys())}")
@@ -115,12 +119,18 @@ def submit_audit():
         photo_base64 = request.form.get('photo_base64')
         photo_filename = request.form.get('photo_filename')
         
+        print(f"Base64 data length: {len(photo_base64) if photo_base64 else 0}")
+        print(f"Base64 filename: {photo_filename}")
+        
         if photo_base64 and photo_filename:
+            print(f"Processing Base64 upload: {photo_filename}")
             app.logger.info(f"Base64 photo received: {photo_filename}")
         elif 'photo' not in request.files:
+            print("No photo field in files and no Base64")
             app.logger.warning("No 'photo' field in request.files and no Base64 data")
         else:
             file = request.files['photo']
+            print(f"Regular file upload: {file.filename if file else 'None'}")
             if not file or not file.filename:
                 app.logger.warning(f"Empty file or no filename: {file}")
             else:
