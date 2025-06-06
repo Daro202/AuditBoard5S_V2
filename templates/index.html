@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Force submit function for mobile devices
+    // AJAX submit function for mobile devices
     window.forceSubmit = function(event) {
         event.preventDefault();
         
@@ -360,10 +360,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Show submission alert
-        alert('Wysyłanie formularza...');
+        alert('Wysyłanie przez AJAX...');
         
-        // Force form submission
-        form.submit();
+        // Prepare form data
+        const formData = new FormData(form);
+        
+        // Send AJAX request
+        fetch('/submit_audit', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Audyt zapisany pomyślnie!');
+                window.location.href = '/';
+            } else {
+                alert('Błąd podczas zapisywania audytu');
+            }
+        })
+        .catch(error => {
+            alert('Błąd sieci: ' + error.message);
+        });
     };
 });
 </script>
