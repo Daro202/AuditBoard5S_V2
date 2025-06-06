@@ -6,6 +6,36 @@ from app import app, db
 from models import Machine, Question, Audit, AuditSession
 from utils import load_excel_data, allowed_file
 from datetime import datetime
+from PIL import Image
+import pillow_heif
+import io
+
+# Register HEIF opener with Pillow
+pillow_heif.register_heif_opener()
+
+def convert_heic_to_jpeg(file_obj, filename):
+    """Convert HEIC/HEIF file to JPEG format"""
+    try:
+        # Open HEIC file with Pillow
+        image = Image.open(file_obj)
+        
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Create new filename with .jpg extension
+        base_name = os.path.splitext(filename)[0]
+        new_filename = f"{base_name}.jpg"
+        
+        # Save to bytes buffer
+        buffer = io.BytesIO()
+        image.save(buffer, format='JPEG', quality=85)
+        buffer.seek(0)
+        
+        return buffer, new_filename
+    except Exception as e:
+        app.logger.error(f"Error converting HEIC to JPEG: {str(e)}")
+        return None, None
 
 @app.route('/')
 def index():
@@ -107,8 +137,26 @@ def submit_audit():
                     if file and file.filename and file.filename != '':
                         debug_file.write(f"Original filename: {file.filename}\n")
                         
-                        if allowed_file(file.filename):
-                            filename = secure_filename(file.filename)
+                        # Check if it's HEIC/HEIF format and convert to JPEG
+                        is_heic = (file.filename.lower().endswith('.heic') or 
+                                 file.filename.lower().endswith('.heif') or
+                                 file.content_type in ['image/heic', 'image/heif'])
+                        
+                        if is_heic:
+                            debug_file.write("HEIC/HEIF format detected - converting to JPEG\n")
+                            converted_buffer, converted_filename = convert_heic_to_jpeg(file, file.filename)
+                            if converted_buffer and converted_filename:
+                                file = converted_buffer
+                                original_filename = converted_filename
+                                debug_file.write(f"Converted to: {converted_filename}\n")
+                            else:
+                                debug_file.write("HEIC conversion failed\n")
+                                original_filename = file.filename
+                        else:
+                            original_filename = file.filename
+                        
+                        if allowed_file(original_filename):
+                            filename = secure_filename(original_filename)
                             # Add timestamp to prevent filename conflicts
                             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
                             filename = timestamp + filename
@@ -120,13 +168,23 @@ def submit_audit():
                             debug_file.write(f"Upload folder exists: {os.path.exists(app.config['UPLOAD_FOLDER'])}\n")
                             
                             # Check file content before saving
-                            file.seek(0, 2)  # Seek to end
-                            file_size_before = file.tell()
-                            file.seek(0)  # Seek back to beginning
+                            if hasattr(file, 'seek'):
+                                file.seek(0, 2)  # Seek to end
+                                file_size_before = file.tell()
+                                file.seek(0)  # Seek back to beginning
+                            else:
+                                file_size_before = len(file.read()) if hasattr(file, 'read') else 0
+                                if hasattr(file, 'seek'):
+                                    file.seek(0)
+                            
                             debug_file.write(f"File size before save: {file_size_before} bytes\n")
                             
-                            # Save file
-                            file.save(file_path)
+                            # Save file (handle both file objects and BytesIO)
+                            if hasattr(file, 'save'):
+                                file.save(file_path)
+                            else:
+                                with open(file_path, 'wb') as f:
+                                    f.write(file.read())
                             debug_file.write(f"File.save() completed\n")
                             
                             # Verify file was saved

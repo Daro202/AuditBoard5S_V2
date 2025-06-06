@@ -129,7 +129,7 @@
                                 <div class="mb-3">
                                     <label for="photo" class="form-label">Zdjęcie dokumentujące</label>
                                     <input type="file" class="form-control" id="photo" name="photo" 
-                                           accept="image/*" capture="environment" onchange="fileSelected(this)">
+                                           accept="image/*,image/heic,image/heif" onchange="fileSelected(this)">
                                     <div class="form-text">
                                         Dozwolone formaty: JPG, PNG, GIF (max 32MB)<br>
                                         Na telefonie: dotknij aby zrobić zdjęcie aparatem
@@ -198,11 +198,21 @@
 </div>
 
 <script>
-// Simple file selection handler
+// Enhanced file selection handler for mobile devices
 function fileSelected(input) {
     const file = input.files[0];
     if (file) {
-        alert('Plik wybrany: ' + file.name + ' (' + Math.round(file.size/1024) + 'KB)');
+        const sizeKB = Math.round(file.size/1024);
+        const sizeMB = Math.round(file.size/1024/1024);
+        
+        // Show file info
+        const info = 'Plik: ' + file.name + '\nRozmiar: ' + (sizeMB > 0 ? sizeMB + 'MB' : sizeKB + 'KB') + '\nTyp: ' + file.type;
+        alert(info);
+        
+        // Check if it's iOS HEIC format and convert if needed
+        if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+            alert('Format HEIC wykryty - zostanie przekonwertowany do JPEG');
+        }
     }
 }
 
