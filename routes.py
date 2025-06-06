@@ -62,26 +62,45 @@ def submit_audit():
         # Handle file upload
         photo_path = None
         try:
+            app.logger.info(f"Request files: {list(request.files.keys())}")
             if 'photo' in request.files:
                 file = request.files['photo']
-                if file and file.filename and file.filename != '' and allowed_file(file.filename):
-                    filename = secure_filename(file.filename)
-                    # Add timestamp to prevent filename conflicts
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                    filename = timestamp + filename
-                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                app.logger.info(f"File object: {file}, filename: {file.filename}, content_type: {file.content_type if file else 'None'}")
+                
+                if file and file.filename and file.filename != '':
+                    app.logger.info(f"Original filename: {file.filename}")
                     
-                    # Ensure upload directory exists
-                    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                    
-                    # Save file
-                    file.save(file_path)
-                    photo_path = f'uploads/{filename}'
-                    app.logger.info(f"Photo saved successfully: {photo_path}")
+                    if allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        # Add timestamp to prevent filename conflicts
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                        filename = timestamp + filename
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        
+                        # Ensure upload directory exists
+                        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                        app.logger.info(f"Saving file to: {file_path}")
+                        
+                        # Save file
+                        file.save(file_path)
+                        
+                        # Verify file was saved
+                        if os.path.exists(file_path):
+                            file_size = os.path.getsize(file_path)
+                            photo_path = f'uploads/{filename}'
+                            app.logger.info(f"Photo saved successfully: {photo_path}, size: {file_size} bytes")
+                        else:
+                            app.logger.error(f"File was not saved to {file_path}")
+                    else:
+                        app.logger.warning(f"File extension not allowed: {file.filename}")
                 else:
-                    app.logger.info("No valid photo file provided")
+                    app.logger.info(f"No valid photo file: file={file}, filename={file.filename if file else 'None'}")
+            else:
+                app.logger.info("No 'photo' key in request.files")
         except Exception as e:
             app.logger.error(f"Error saving photo: {str(e)}")
+            import traceback
+            app.logger.error(f"Traceback: {traceback.format_exc()}")
             # Continue without photo - don't break the audit submission
         
         # Calculate audit sequence number for this machine
@@ -349,7 +368,12 @@ def save_action():
 def uploaded_file(filename):
     """Serve uploaded files"""
     try:
-        return app.send_static_file(f'uploads/{filename}')
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(file_path):
+            return app.send_static_file(f'uploads/{filename}')
+        else:
+            app.logger.error(f"File not found: {file_path}")
+            return "File not found", 404
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
         return "File not found", 404
