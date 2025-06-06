@@ -16,7 +16,7 @@
     </div>
 </div>
 
-{% if machines and questions %}
+{% if machines %}
     <!-- Legend -->
     <div class="card mb-4">
         <div class="card-body">
@@ -28,11 +28,15 @@
                 </span>
                 <span class="badge bg-danger p-2">
                     <i class="fas fa-times me-1"></i>
-                    NIE - Niezgodność
+                    NOK - Niezgodność
                 </span>
                 <span class="badge bg-secondary p-2">
                     <i class="fas fa-question me-1"></i>
                     Brak audytu
+                </span>
+                <span class="badge bg-info p-2">
+                    <i class="fas fa-check-double me-1"></i>
+                    Działanie zakończone pozytywnie
                 </span>
             </div>
         </div>
@@ -43,13 +47,15 @@
         <table class="table table-bordered audit-matrix">
             <thead class="table-dark">
                 <tr>
-                    <th class="sticky-left">Maszyna / Pytanie</th>
-                    {% for question in questions %}
-                        <th class="text-center question-header" title="{{ question.description }}">
-                            <div class="question-code">{{ question.code }}</div>
-                            <small class="text-muted">{{ question.description[:30] }}...</small>
-                        </th>
-                    {% endfor %}
+                    <th class="sticky-left">Maszyna</th>
+                    <th class="text-center audit-column">Audyt 1</th>
+                    <th class="text-center audit-column">Audyt 2</th>
+                    <th class="text-center audit-column">Audyt 3</th>
+                    <th class="text-center audit-column">Audyt 4</th>
+                    <th class="text-center audit-column">Audyt 5</th>
+                    <th class="text-center stats-column">OK</th>
+                    <th class="text-center stats-column">NOK</th>
+                    <th class="text-center stats-column">Pozytywne</th>
                 </tr>
             </thead>
             <tbody>
@@ -58,27 +64,33 @@
                         <td class="sticky-left machine-name">
                             <strong>{{ machine.name }}</strong>
                         </td>
-                        {% for question in questions %}
-                            {% set key = machine.id ~ '_' ~ question.id %}
-                            {% set audits = audit_matrix.get(key, []) %}
-                            {% set latest_audit = audits[-1] if audits else None %}
-                            
+                        
+                        <!-- Audit columns 1-5 -->
+                        {% for sequence in range(1, 6) %}
+                            {% set audit = audit_matrix[machine.id][sequence] %}
                             <td class="text-center audit-cell" 
                                 data-machine-id="{{ machine.id }}" 
-                                data-question-id="{{ question.id }}">
-                                {% if latest_audit %}
-                                    <div class="audit-status-indicator {{ 'status-ok' if latest_audit.status == 'OK' else 'status-nie' }}"
+                                data-audit-sequence="{{ sequence }}">
+                                {% if audit %}
+                                    <div class="audit-status-indicator {{ 'status-ok' if audit.status == 'OK' else 'status-nok' }}"
                                          data-bs-toggle="tooltip" 
                                          data-bs-placement="top"
                                          title="Kliknij aby zobaczyć szczegóły">
-                                        {% if latest_audit.status == 'OK' %}
+                                        {% if audit.status == 'OK' %}
                                             <i class="fas fa-check"></i>
                                         {% else %}
                                             <i class="fas fa-times"></i>
                                         {% endif %}
                                         <small class="d-block mt-1">
-                                            {{ latest_audit.created_at.strftime('%m/%d') }}
+                                            {{ audit.created_at.strftime('%m/%d') }}
                                         </small>
+                                        
+                                        <!-- Green square for completed action -->
+                                        {% if audit.action_completed %}
+                                            <div class="action-completed-indicator">
+                                                <i class="fas fa-check-double"></i>
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 {% else %}
                                     <div class="audit-status-indicator status-none"
@@ -89,6 +101,17 @@
                                 {% endif %}
                             </td>
                         {% endfor %}
+                        
+                        <!-- Statistics columns -->
+                        <td class="text-center stats-cell bg-success-subtle">
+                            <strong class="text-success">{{ stats[machine.id].ok_count }}</strong>
+                        </td>
+                        <td class="text-center stats-cell bg-danger-subtle">
+                            <strong class="text-danger">{{ stats[machine.id].nok_count }}</strong>
+                        </td>
+                        <td class="text-center stats-cell bg-info-subtle">
+                            <strong class="text-info">{{ stats[machine.id].action_completed_count }}</strong>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -141,16 +164,16 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.audit-cell').forEach(cell => {
         cell.addEventListener('click', function() {
             const machineId = this.dataset.machineId;
-            const questionId = this.dataset.questionId;
+            const auditSequence = this.dataset.auditSequence;
             
-            if (machineId && questionId) {
-                loadAuditDetails(machineId, questionId);
+            if (machineId && auditSequence) {
+                loadAuditDetails(machineId, auditSequence);
             }
         });
     });
 });
 
-function loadAuditDetails(machineId, questionId) {
+function loadAuditDetails(machineId, auditSequence) {
     const modalBody = document.getElementById('auditModalBody');
     modalBody.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Ładowanie...</div>';
     
@@ -159,7 +182,7 @@ function loadAuditDetails(machineId, questionId) {
     modal.show();
     
     // Fetch audit data
-    fetch(`/api/audit_data/${machineId}/${questionId}`)
+    fetch(`/api/audit_data/${machineId}/${auditSequence}`)
         .then(response => response.json())
         .then(data => {
             let content = '';
@@ -169,19 +192,26 @@ function loadAuditDetails(machineId, questionId) {
                     <div class="text-center py-4">
                         <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
                         <h5>Brak audytu</h5>
-                        <p class="text-muted">Dla tej pary maszyna-pytanie nie przeprowadzono jeszcze audytu.</p>
+                        <p class="text-muted">Dla tego audytu nie przeprowadzono jeszcze kontroli.</p>
                     </div>
                 `;
             } else {
                 const statusBadge = data.status === 'OK' 
                     ? '<span class="badge bg-success"><i class="fas fa-check me-1"></i>OK</span>'
-                    : '<span class="badge bg-danger"><i class="fas fa-times me-1"></i>NIE</span>';
+                    : '<span class="badge bg-danger"><i class="fas fa-times me-1"></i>NOK</span>';
+                
+                const actionBadge = data.action_completed 
+                    ? '<span class="badge bg-info ms-2"><i class="fas fa-check-double me-1"></i>Działanie zakończone pozytywnie</span>'
+                    : '';
                 
                 content = `
                     <div class="row">
                         <div class="col-md-6">
                             <h6>Status:</h6>
-                            <p>${statusBadge}</p>
+                            <p>${statusBadge}${actionBadge}</p>
+                            
+                            <h6>Pytanie audytowe:</h6>
+                            <p><strong>${data.question_code}:</strong> ${data.question_description}</p>
                             
                             <h6>Audytor:</h6>
                             <p>${data.auditor}</p>

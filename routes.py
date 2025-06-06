@@ -46,6 +46,7 @@ def submit_audit():
         status = request.form.get('status')
         description = request.form.get('description')
         auditor_name = request.form.get('auditor_name', '')
+        action_completed = request.form.get('action_completed') == 'on'
         
         # Validate required fields
         if not all([session_id, status, description]):
@@ -71,6 +72,10 @@ def submit_audit():
                 file.save(file_path)
                 photo_path = f'uploads/{filename}'
         
+        # Calculate audit sequence number for this machine
+        machine_audit_count = Audit.query.filter_by(machine_id=session.machine_id).count()
+        audit_sequence = machine_audit_count + 1
+        
         # Create audit record
         audit = Audit(
             machine_id=session.machine_id,
@@ -78,7 +83,9 @@ def submit_audit():
             status=status,
             description=description,
             photo_path=photo_path,
-            auditor_name=auditor_name
+            auditor_name=auditor_name,
+            action_completed=action_completed,
+            audit_sequence=audit_sequence
         )
         
         # Mark session as used
@@ -98,25 +105,43 @@ def submit_audit():
 
 @app.route('/dashboard')
 def dashboard():
-    """Audit dashboard with grid visualization"""
+    """Audit dashboard with grid visualization - columns represent audit sequence (1-5)"""
     machines = Machine.query.all()
-    questions = Question.query.all()
     
-    # Get all audits with their relationships
-    audits = Audit.query.all()
-    
-    # Create audit matrix
+    # Get audits organized by machine and sequence
     audit_matrix = {}
-    for audit in audits:
-        key = f"{audit.machine_id}_{audit.question_id}"
-        if key not in audit_matrix:
-            audit_matrix[key] = []
-        audit_matrix[key].append(audit)
+    stats = {}
+    
+    for machine in machines:
+        # Get audits for this machine ordered by sequence
+        machine_audits = Audit.query.filter_by(machine_id=machine.id).order_by(Audit.audit_sequence).all()
+        
+        # Organize audits by sequence (1-5)
+        audit_matrix[machine.id] = {}
+        for i in range(1, 6):  # Columns 1-5
+            audit_matrix[machine.id][i] = None
+        
+        # Fill in actual audits
+        for audit in machine_audits:
+            if audit.audit_sequence and audit.audit_sequence <= 5:
+                audit_matrix[machine.id][audit.audit_sequence] = audit
+        
+        # Calculate statistics for this machine
+        ok_count = len([a for a in machine_audits if a.status == 'OK'])
+        nok_count = len([a for a in machine_audits if a.status == 'NOK'])
+        action_completed_count = len([a for a in machine_audits if a.action_completed])
+        
+        stats[machine.id] = {
+            'ok_count': ok_count,
+            'nok_count': nok_count,
+            'action_completed_count': action_completed_count,
+            'total_audits': len(machine_audits)
+        }
     
     return render_template('dashboard.html', 
                          machines=machines, 
-                         questions=questions, 
-                         audit_matrix=audit_matrix)
+                         audit_matrix=audit_matrix,
+                         stats=stats)
 
 @app.route('/upload_excel', methods=['POST'])
 def upload_excel():
@@ -219,21 +244,24 @@ def _create_new_audit_session():
     db.session.commit()
     app.logger.info(f"Created {len(pairs)} audit session pairs")
 
-@app.route('/api/audit_data/<int:machine_id>/<int:question_id>')
-def get_audit_data(machine_id, question_id):
+@app.route('/api/audit_data/<int:machine_id>/<int:audit_sequence>')
+def get_audit_data(machine_id, audit_sequence):
     """API endpoint to get audit data for tooltip"""
-    audits = Audit.query.filter_by(machine_id=machine_id, question_id=question_id).all()
+    audit = Audit.query.filter_by(machine_id=machine_id, audit_sequence=audit_sequence).first()
     
-    if not audits:
+    if not audit:
         return jsonify({'status': 'none', 'message': 'Brak audytu'})
     
-    # Get the latest audit
-    latest_audit = audits[-1]
+    # Get question details
+    question = Question.query.get(audit.question_id)
     
     return jsonify({
-        'status': latest_audit.status,
-        'description': latest_audit.description,
-        'auditor': latest_audit.auditor_name or 'Nieznany',
-        'date': latest_audit.created_at.strftime('%Y-%m-%d %H:%M'),
-        'photo_path': latest_audit.photo_path
+        'status': audit.status,
+        'description': audit.description,
+        'auditor': audit.auditor_name or 'Nieznany',
+        'date': audit.created_at.strftime('%Y-%m-%d %H:%M'),
+        'photo_path': audit.photo_path,
+        'action_completed': audit.action_completed,
+        'question_code': question.code if question else 'N/A',
+        'question_description': question.description if question else 'N/A'
     })

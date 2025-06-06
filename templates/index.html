@@ -95,11 +95,25 @@
                                             OK
                                         </label>
                                         
-                                        <input type="radio" class="btn-check" name="status" id="status_nie" value="NIE" required>
-                                        <label class="btn btn-outline-danger" for="status_nie">
+                                        <input type="radio" class="btn-check" name="status" id="status_nok" value="NOK" required>
+                                        <label class="btn btn-outline-danger" for="status_nok">
                                             <i class="fas fa-times me-1"></i>
-                                            NIE
+                                            NOK
                                         </label>
+                                    </div>
+                                </div>
+
+                                <!-- Action completed checkbox (only for NOK) -->
+                                <div class="mb-3" id="action-completed-section" style="display: none;">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="action_completed" id="action_completed">
+                                        <label class="form-check-label fw-bold text-info" for="action_completed">
+                                            <i class="fas fa-check-double me-1"></i>
+                                            Działanie zakończone pozytywnie
+                                        </label>
+                                        <div class="form-text">
+                                            Zaznacz jeśli podjęto działania naprawcze i problem został rozwiązany
+                                        </div>
                                     </div>
                                 </div>
 

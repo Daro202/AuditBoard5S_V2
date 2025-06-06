@@ -32,11 +32,13 @@ class Audit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     machine_id = db.Column(db.Integer, db.ForeignKey('machine.id'), nullable=False)
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
-    status = db.Column(db.String(10), nullable=False)  # 'OK' or 'NIE'
+    status = db.Column(db.String(10), nullable=False)  # 'OK' or 'NOK'
     description = db.Column(db.Text, nullable=False)
     photo_path = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     auditor_name = db.Column(db.String(100), nullable=True)
+    action_completed = db.Column(db.Boolean, default=False)  # Czy działanie zostało zakończone pozytywnie
+    audit_sequence = db.Column(db.Integer, nullable=True)  # Kolejny numer audytu dla danej maszyny
     
     def __repr__(self):
         return f'<Audit {self.machine.name} - {self.question.code} - {self.status}>'
