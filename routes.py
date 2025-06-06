@@ -72,6 +72,10 @@ def index():
 @app.route('/submit_audit', methods=['POST'])
 def submit_audit():
     """Submit audit result"""
+    # Force immediate logging to identify if endpoint is called
+    print("=== SUBMIT_AUDIT ENDPOINT CALLED ===")
+    app.logger.critical("=== SUBMIT_AUDIT ENDPOINT CALLED ===")
+    
     try:
         session_id = request.form.get('session_id')
         status = request.form.get('status')
