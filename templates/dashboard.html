@@ -307,6 +307,15 @@ function loadAuditDetails(machineId, auditSequence) {
             }
             
             modalBody.innerHTML = content;
+            
+            // Add form submission handler for action form
+            const actionForm = document.getElementById('actionForm');
+            if (actionForm) {
+                actionForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    saveAction(this);
+                });
+            }
         })
         .catch(error => {
             console.error('Error:', error);
@@ -317,6 +326,70 @@ function loadAuditDetails(machineId, auditSequence) {
                 </div>
             `;
         });
+}
+
+function saveAction(form) {
+    const formData = new FormData(form);
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    
+    // Show loading state
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Zapisywanie...';
+    submitButton.disabled = true;
+    
+    fetch('/save_action', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success';
+            alertDiv.innerHTML = `
+                <i class="fas fa-check-circle me-2"></i>
+                ${data.message}
+            `;
+            form.parentNode.insertBefore(alertDiv, form);
+            
+            // Hide form and reload audit details after short delay
+            setTimeout(() => {
+                const machineId = document.querySelector('.audit-cell[data-audit-sequence]').dataset.machineId;
+                const auditSequence = document.querySelector('.audit-cell[data-audit-sequence]').dataset.auditSequence;
+                loadAuditDetails(machineId, auditSequence);
+                
+                // Refresh the page to update the audit matrix
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }, 2000);
+        } else {
+            // Show error message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger';
+            alertDiv.innerHTML = `
+                <i class="fas fa-exclamation-circle me-2"></i>
+                ${data.message}
+            `;
+            form.parentNode.insertBefore(alertDiv, form);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger';
+        alertDiv.innerHTML = `
+            <i class="fas fa-exclamation-circle me-2"></i>
+            Wystąpił błąd podczas zapisywania działania.
+        `;
+        form.parentNode.insertBefore(alertDiv, form);
+    })
+    .finally(() => {
+        // Restore button state
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    });
 }
 </script>
 {% endblock %}

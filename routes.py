@@ -129,7 +129,7 @@ def dashboard():
         # Calculate statistics for this machine
         ok_count = len([a for a in machine_audits if a.status == 'OK'])
         nok_count = len([a for a in machine_audits if a.status == 'NOK'])
-        action_completed_count = len([a for a in machine_audits if a.action_completed])
+        action_completed_count = len([a for a in machine_audits if a.dzialanie_ok])
         
         stats[machine.id] = {
             'ok_count': ok_count,
