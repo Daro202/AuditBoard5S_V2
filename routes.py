@@ -62,45 +62,69 @@ def submit_audit():
         # Handle file upload
         photo_path = None
         try:
-            app.logger.info(f"Request files: {list(request.files.keys())}")
-            if 'photo' in request.files:
-                file = request.files['photo']
-                app.logger.info(f"File object: {file}, filename: {file.filename}, content_type: {file.content_type if file else 'None'}")
+            # Debug logging to file
+            with open('/tmp/upload_debug.log', 'a') as debug_file:
+                debug_file.write(f"\n=== Upload Debug {datetime.now()} ===\n")
+                debug_file.write(f"Request files: {list(request.files.keys())}\n")
+                debug_file.write(f"Request form: {dict(request.form)}\n")
                 
-                if file and file.filename and file.filename != '':
-                    app.logger.info(f"Original filename: {file.filename}")
+                if 'photo' in request.files:
+                    file = request.files['photo']
+                    debug_file.write(f"File object: {file}\n")
+                    debug_file.write(f"Filename: {file.filename}\n")
+                    debug_file.write(f"Content type: {file.content_type if file else 'None'}\n")
+                    debug_file.write(f"Content length: {file.content_length if file else 'None'}\n")
                     
-                    if allowed_file(file.filename):
-                        filename = secure_filename(file.filename)
-                        # Add timestamp to prevent filename conflicts
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                        filename = timestamp + filename
-                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    if file and file.filename and file.filename != '':
+                        debug_file.write(f"Original filename: {file.filename}\n")
                         
-                        # Ensure upload directory exists
-                        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                        app.logger.info(f"Saving file to: {file_path}")
-                        
-                        # Save file
-                        file.save(file_path)
-                        
-                        # Verify file was saved
-                        if os.path.exists(file_path):
-                            file_size = os.path.getsize(file_path)
-                            photo_path = f'uploads/{filename}'
-                            app.logger.info(f"Photo saved successfully: {photo_path}, size: {file_size} bytes")
+                        if allowed_file(file.filename):
+                            filename = secure_filename(file.filename)
+                            # Add timestamp to prevent filename conflicts
+                            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                            filename = timestamp + filename
+                            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                            
+                            # Ensure upload directory exists
+                            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                            debug_file.write(f"Saving file to: {file_path}\n")
+                            debug_file.write(f"Upload folder exists: {os.path.exists(app.config['UPLOAD_FOLDER'])}\n")
+                            
+                            # Check file content before saving
+                            file.seek(0, 2)  # Seek to end
+                            file_size_before = file.tell()
+                            file.seek(0)  # Seek back to beginning
+                            debug_file.write(f"File size before save: {file_size_before} bytes\n")
+                            
+                            # Save file
+                            file.save(file_path)
+                            debug_file.write(f"File.save() completed\n")
+                            
+                            # Verify file was saved
+                            if os.path.exists(file_path):
+                                file_size = os.path.getsize(file_path)
+                                photo_path = f'uploads/{filename}'
+                                debug_file.write(f"Photo saved successfully: {photo_path}, size: {file_size} bytes\n")
+                                app.logger.info(f"Photo saved successfully: {photo_path}, size: {file_size} bytes")
+                            else:
+                                debug_file.write(f"ERROR: File was not saved to {file_path}\n")
+                                app.logger.error(f"File was not saved to {file_path}")
                         else:
-                            app.logger.error(f"File was not saved to {file_path}")
+                            debug_file.write(f"File extension not allowed: {file.filename}\n")
+                            app.logger.warning(f"File extension not allowed: {file.filename}")
                     else:
-                        app.logger.warning(f"File extension not allowed: {file.filename}")
+                        debug_file.write(f"No valid photo file: file={file}, filename={file.filename if file else 'None'}\n")
+                        app.logger.info(f"No valid photo file: file={file}, filename={file.filename if file else 'None'}")
                 else:
-                    app.logger.info(f"No valid photo file: file={file}, filename={file.filename if file else 'None'}")
-            else:
-                app.logger.info("No 'photo' key in request.files")
+                    debug_file.write("No 'photo' key in request.files\n")
+                    app.logger.info("No 'photo' key in request.files")
+                    
         except Exception as e:
+            with open('/tmp/upload_debug.log', 'a') as debug_file:
+                debug_file.write(f"EXCEPTION: {str(e)}\n")
+                import traceback
+                debug_file.write(f"Traceback: {traceback.format_exc()}\n")
             app.logger.error(f"Error saving photo: {str(e)}")
-            import traceback
-            app.logger.error(f"Traceback: {traceback.format_exc()}")
             # Continue without photo - don't break the audit submission
         
         # Calculate audit sequence number for this machine
