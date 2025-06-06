@@ -149,7 +149,7 @@
 
                         <!-- Submit buttons -->
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <button type="submit" class="btn btn-primary btn-lg">
+                            <button type="submit" class="btn btn-primary btn-lg" onclick="forceSubmit(event)">
                                 <i class="fas fa-save me-1"></i>
                                 Zapisz audyt
                             </button>
@@ -334,6 +334,37 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+    
+    // Force submit function for mobile devices
+    window.forceSubmit = function(event) {
+        event.preventDefault();
+        
+        const form = document.querySelector('form[action="/submit_audit"]');
+        if (!form) {
+            alert('Błąd: nie znaleziono formularza');
+            return;
+        }
+        
+        // Check required fields
+        const status = form.querySelector('input[name="status"]:checked');
+        const description = form.querySelector('textarea[name="description"]');
+        
+        if (!status) {
+            alert('Wybierz status audytu (OK/NOK)');
+            return;
+        }
+        
+        if (!description || !description.value.trim()) {
+            alert('Wprowadź opis audytu');
+            return;
+        }
+        
+        // Show submission alert
+        alert('Wysyłanie formularza...');
+        
+        // Force form submission
+        form.submit();
+    };
 });
 </script>
 {% endblock %}

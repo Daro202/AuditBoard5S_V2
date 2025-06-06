@@ -1,0 +1,70 @@
+Problem z uploadem zdjęć w Twojej aplikacji 5S może wynikać z kilku najczęstszych przyczyn – oto lista typowych błędów oraz ich możliwe rozwiązania:
+
+❌ 1. Brak obsługi pliku w backendzie (Flask)
+Objaw: zdjęcie w formularzu jest, ale nie zapisuje się na serwerze.
+Przyczyna: brak kodu obsługującego request.files['zdjecie'].
+
+✅ Rozwiązanie:
+
+python
+Kopiuj
+Edytuj
+plik = request.files.get('zdjecie')
+if plik and plik.filename != '':
+    filename = secure_filename(plik.filename)
+    plik.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+❌ 2. Brak folderu docelowego lub brak uprawnień
+Objaw: zdjęcie nie zostaje zapisane na serwerze.
+Przyczyna: folder static/uploads/ nie istnieje lub nie ma prawa zapisu.
+
+✅ Rozwiązanie:
+
+Upewnij się, że folder istnieje:
+
+bash
+Kopiuj
+Edytuj
+mkdir -p static/uploads
+W Replit sprawdź, czy masz odpowiednie uprawnienia do zapisu.
+
+❌ 3. Formularz HTML nie ma enctype="multipart/form-data"
+Objaw: formularz przesyła tylko tekst, a request.files jest puste.
+Przyczyna: formularz nie został odpowiednio ustawiony.
+
+✅ Rozwiązanie:
+
+html
+Kopiuj
+Edytuj
+<form method="POST" enctype="multipart/form-data">
+❌ 4. Zbyt duży rozmiar pliku
+Objaw: przesyłanie zdjęcia kończy się błędem.
+Przyczyna: plik przekracza domyślny limit (np. 1 MB).
+
+✅ Rozwiązanie:
+Dodaj w app.py:
+
+python
+Kopiuj
+Edytuj
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB
+❌ 5. Nie zapisano ścieżki do zdjęcia w bazie danych
+Objaw: zdjęcie zapisało się na serwerze, ale nie widać go w aplikacji.
+Przyczyna: nie została zapisana informacja o jego lokalizacji (np. /static/uploads/nazwa.jpg).
+
+✅ Rozwiązanie:
+
+python
+Kopiuj
+Edytuj
+sciezka = f"/static/uploads/{filename}"
+# zapis do bazy danych
+❌ 6. Problem z telefonem (Android/iOS)
+Objaw: z komputera działa, z telefonu nie.
+Przyczyna: przeglądarka mobilna może nie przesłać pliku lub ograniczyć rozmiar. Czasem pole input type="file" nie działa tak samo na wszystkich systemach.
+
+✅ Rozwiązanie:
+
+Upewnij się, że name="zdjecie" jest poprawnie ustawione w formularzu.
+
+Testuj zarówno na Androidzie, jak i iOS.
