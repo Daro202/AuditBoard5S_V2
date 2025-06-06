@@ -10,9 +10,20 @@ from PIL import Image
 import pillow_heif
 import io
 import base64
+import cloudinary
+import cloudinary.uploader
+from cloudinary.utils import cloudinary_url
 
 # Register HEIF opener with Pillow
 pillow_heif.register_heif_opener()
+
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    secure=True
+)
 
 # Global request interceptor to catch all POST requests
 @app.before_request
@@ -25,6 +36,33 @@ def log_all_requests():
         print(f"URL: {request.url}")
         print(f"Form: {list(request.form.keys())}")
         print(f"Files: {list(request.files.keys())}")
+
+def upload_to_cloudinary(file_obj, filename):
+    """Upload image to Cloudinary cloud storage"""
+    try:
+        # Reset file pointer to beginning
+        file_obj.seek(0)
+        
+        # Upload to Cloudinary with folder organization
+        result = cloudinary.uploader.upload(
+            file_obj,
+            folder="audit_photos",
+            public_id=f"audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            resource_type="image",
+            format="jpg",
+            quality="auto:good",
+            transformation=[
+                {"width": 1200, "height": 1200, "crop": "limit"},
+                {"quality": "auto:good"}
+            ]
+        )
+        
+        app.logger.info(f"Successfully uploaded to Cloudinary: {result['secure_url']}")
+        return result['secure_url']
+        
+    except Exception as e:
+        app.logger.error(f"Error uploading to Cloudinary: {str(e)}")
+        return None
 
 def convert_heic_to_jpeg(file_obj, filename):
     """Convert HEIC/HEIF file to JPEG format"""
@@ -106,15 +144,12 @@ def submit_audit():
             flash('Nieprawidłowa sesja audytu.', 'error')
             return redirect(url_for('index'))
         
-        # Handle file upload with enhanced mobile support
+        # Handle file upload with Cloudinary
         photo_path = None
-        
-        # Ensure upload directory exists
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         
         try:
             # Debug logging
-            app.logger.info(f"=== UPLOAD DEBUG ===")
+            app.logger.info(f"=== CLOUDINARY UPLOAD DEBUG ===")
             app.logger.info(f"Form keys: {list(request.form.keys())}")
             app.logger.info(f"Files keys: {list(request.files.keys())}")
             
@@ -126,8 +161,8 @@ def submit_audit():
             app.logger.info(f"Base64 filename: {photo_filename}")
             
             if photo_base64 and photo_filename:
-                # Process Base64 upload
-                app.logger.info("Processing Base64 upload")
+                # Process Base64 upload to Cloudinary
+                app.logger.info("Processing Base64 upload to Cloudinary")
                 try:
                     # Decode Base64 data
                     if ',' in photo_base64:
@@ -139,28 +174,17 @@ def submit_audit():
                     app.logger.info(f"Decoded image size: {len(image_data)} bytes")
                     
                     if allowed_file(photo_filename):
-                        filename = secure_filename(photo_filename)
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                        filename = timestamp + filename
-                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        # Create BytesIO object for Cloudinary upload
+                        image_buffer = io.BytesIO(image_data)
                         
-                        app.logger.info(f"Saving Base64 file to: {file_path}")
+                        # Upload to Cloudinary
+                        cloudinary_url = upload_to_cloudinary(image_buffer, photo_filename)
                         
-                        # Save Base64 decoded file
-                        with open(file_path, 'wb') as f:
-                            f.write(image_data)
-                        
-                        app.logger.info(f"File written, checking existence...")
-                        if os.path.exists(file_path):
-                            file_size = os.path.getsize(file_path)
-                            app.logger.info(f"File exists with size: {file_size} bytes")
-                            if file_size > 0:
-                                photo_path = f'uploads/{filename}'
-                                app.logger.info(f"Base64 photo saved successfully: {photo_path}")
-                            else:
-                                app.logger.error("File exists but is empty!")
+                        if cloudinary_url:
+                            photo_path = cloudinary_url
+                            app.logger.info(f"Base64 photo uploaded to Cloudinary: {photo_path}")
                         else:
-                            app.logger.error("File was not created!")
+                            app.logger.error("Failed to upload to Cloudinary")
                     else:
                         app.logger.warning(f"File extension not allowed: {photo_filename}")
                 
@@ -196,36 +220,16 @@ def submit_audit():
                         original_filename = file.filename
                     
                     if allowed_file(original_filename):
-                        filename = secure_filename(original_filename)
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                        filename = timestamp + filename
-                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                        app.logger.info(f"Uploading regular file to Cloudinary: {original_filename}")
                         
-                        app.logger.info(f"Saving regular file to: {file_path}")
+                        # Upload to Cloudinary
+                        cloudinary_url = upload_to_cloudinary(file, original_filename)
                         
-                        # Save file
-                        try:
-                            file.save(file_path)
-                            app.logger.info("file.save() completed")
-                        except AttributeError:
-                            app.logger.info("Using manual save for BytesIO")
-                            # Handle BytesIO objects from HEIC conversion
-                            with open(file_path, 'wb') as f:
-                                if hasattr(file, 'read'):
-                                    file.seek(0)
-                                    f.write(file.read())
-                        
-                        # Verify file was saved correctly
-                        if os.path.exists(file_path):
-                            file_size = os.path.getsize(file_path)
-                            app.logger.info(f"File exists with size: {file_size} bytes")
-                            if file_size > 0:
-                                photo_path = f'uploads/{filename}'
-                                app.logger.info(f"Regular photo saved successfully: {photo_path}")
-                            else:
-                                app.logger.error("File exists but is empty!")
+                        if cloudinary_url:
+                            photo_path = cloudinary_url
+                            app.logger.info(f"Regular photo uploaded to Cloudinary: {photo_path}")
                         else:
-                            app.logger.error("File was not created!")
+                            app.logger.error("Failed to upload regular file to Cloudinary")
                     else:
                         app.logger.warning(f"File extension not allowed: {original_filename}")
                 else:
