@@ -97,12 +97,21 @@ def submit_audit():
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         
         try:
+            # Debug logging
+            app.logger.info(f"=== UPLOAD DEBUG ===")
+            app.logger.info(f"Form keys: {list(request.form.keys())}")
+            app.logger.info(f"Files keys: {list(request.files.keys())}")
+            
             # Check for Base64 data first (mobile devices)
             photo_base64 = request.form.get('photo_base64')
             photo_filename = request.form.get('photo_filename')
             
+            app.logger.info(f"Base64 data present: {bool(photo_base64)}")
+            app.logger.info(f"Base64 filename: {photo_filename}")
+            
             if photo_base64 and photo_filename:
                 # Process Base64 upload
+                app.logger.info("Processing Base64 upload")
                 try:
                     # Decode Base64 data
                     if ',' in photo_base64:
@@ -111,6 +120,7 @@ def submit_audit():
                         data = photo_base64
                     
                     image_data = base64.b64decode(data)
+                    app.logger.info(f"Decoded image size: {len(image_data)} bytes")
                     
                     if allowed_file(photo_filename):
                         filename = secure_filename(photo_filename)
@@ -118,34 +128,54 @@ def submit_audit():
                         filename = timestamp + filename
                         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                         
+                        app.logger.info(f"Saving Base64 file to: {file_path}")
+                        
                         # Save Base64 decoded file
                         with open(file_path, 'wb') as f:
                             f.write(image_data)
                         
-                        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                            photo_path = f'uploads/{filename}'
-                            app.logger.info(f"Base64 photo saved: {photo_path}")
+                        app.logger.info(f"File written, checking existence...")
+                        if os.path.exists(file_path):
+                            file_size = os.path.getsize(file_path)
+                            app.logger.info(f"File exists with size: {file_size} bytes")
+                            if file_size > 0:
+                                photo_path = f'uploads/{filename}'
+                                app.logger.info(f"Base64 photo saved successfully: {photo_path}")
+                            else:
+                                app.logger.error("File exists but is empty!")
+                        else:
+                            app.logger.error("File was not created!")
+                    else:
+                        app.logger.warning(f"File extension not allowed: {photo_filename}")
                 
                 except Exception as e:
                     app.logger.error(f"Base64 processing error: {str(e)}")
+                    import traceback
+                    app.logger.error(f"Traceback: {traceback.format_exc()}")
             
             elif 'photo' in request.files:
                 # Process regular file upload
                 file = request.files['photo']
+                app.logger.info(f"Processing regular file upload: {file.filename if file else 'None'}")
                 
                 if file and file.filename and file.filename != '':
+                    app.logger.info(f"File details: name={file.filename}, type={file.content_type}")
+                    
                     # Check for HEIC/HEIF and convert
                     is_heic = (file.filename.lower().endswith('.heic') or 
                              file.filename.lower().endswith('.heif') or
                              (file.content_type and file.content_type in ['image/heic', 'image/heif']))
                     
                     if is_heic:
+                        app.logger.info("Converting HEIC/HEIF file")
                         converted_buffer, converted_filename = convert_heic_to_jpeg(file, file.filename)
                         if converted_buffer and converted_filename:
                             file = converted_buffer
                             original_filename = converted_filename
+                            app.logger.info(f"Converted to: {converted_filename}")
                         else:
                             original_filename = file.filename
+                            app.logger.warning("HEIC conversion failed")
                     else:
                         original_filename = file.filename
                     
@@ -155,10 +185,14 @@ def submit_audit():
                         filename = timestamp + filename
                         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                         
+                        app.logger.info(f"Saving regular file to: {file_path}")
+                        
                         # Save file
                         try:
                             file.save(file_path)
+                            app.logger.info("file.save() completed")
                         except AttributeError:
+                            app.logger.info("Using manual save for BytesIO")
                             # Handle BytesIO objects from HEIC conversion
                             with open(file_path, 'wb') as f:
                                 if hasattr(file, 'read'):
@@ -166,12 +200,27 @@ def submit_audit():
                                     f.write(file.read())
                         
                         # Verify file was saved correctly
-                        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                            photo_path = f'uploads/{filename}'
-                            app.logger.info(f"Photo saved: {photo_path}")
+                        if os.path.exists(file_path):
+                            file_size = os.path.getsize(file_path)
+                            app.logger.info(f"File exists with size: {file_size} bytes")
+                            if file_size > 0:
+                                photo_path = f'uploads/{filename}'
+                                app.logger.info(f"Regular photo saved successfully: {photo_path}")
+                            else:
+                                app.logger.error("File exists but is empty!")
+                        else:
+                            app.logger.error("File was not created!")
+                    else:
+                        app.logger.warning(f"File extension not allowed: {original_filename}")
+                else:
+                    app.logger.info("No valid file found")
+            else:
+                app.logger.info("No photo data found in request")
                             
         except Exception as e:
             app.logger.error(f"Error saving photo: {str(e)}")
+            import traceback
+            app.logger.error(f"Traceback: {traceback.format_exc()}")
             # Continue without photo - don't break the audit submission
         
         # Calculate audit sequence number for this machine
