@@ -131,7 +131,7 @@
                                     <input type="file" class="form-control" id="photo" name="photo" 
                                            accept="image/*" capture="environment">
                                     <div class="form-text">
-                                        Dozwolone formaty: JPG, PNG, GIF (max 16MB)<br>
+                                        Dozwolone formaty: JPG, PNG, GIF (max 32MB)<br>
                                         Na telefonie: dotknij aby zrobić zdjęcie aparatem
                                     </div>
                                 </div>
@@ -218,6 +218,57 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Debug file upload
+    const photoInput = document.getElementById('photo');
+    if (photoInput) {
+        photoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                console.log('File selected:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    lastModified: file.lastModified
+                });
+                
+                // Check file size
+                const maxSize = 32 * 1024 * 1024; // 32MB
+                if (file.size > maxSize) {
+                    alert('Plik jest za duży. Maksymalny rozmiar to 32MB.');
+                    e.target.value = '';
+                    return;
+                }
+                
+                // Debug log to help identify issues
+                fetch('/debug_upload', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        filename: file.name,
+                        size: file.size,
+                        type: file.type
+                    })
+                }).catch(err => console.log('Debug log failed:', err));
+            }
+        });
+    }
+    
+    // Debug form submission
+    const auditForm = document.querySelector('form[action="/submit_audit"]');
+    if (auditForm) {
+        auditForm.addEventListener('submit', function(e) {
+            const formData = new FormData(this);
+            const file = formData.get('photo');
+            
+            console.log('Form submission:', {
+                hasFile: !!file,
+                fileName: file ? file.name : 'none',
+                fileSize: file ? file.size : 0,
+                formEntries: Array.from(formData.entries()).map(([k, v]) => [k, v instanceof File ? `File: ${v.name}` : v])
+            });
+        });
+    }
 });
 </script>
 {% endblock %}

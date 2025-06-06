@@ -415,3 +415,17 @@ def uploaded_file(filename):
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
         return "File not found", 404
+
+@app.route('/debug_upload', methods=['POST'])
+def debug_upload():
+    """Debug endpoint for file upload information"""
+    try:
+        data = request.get_json()
+        with open('/tmp/js_upload_debug.log', 'a') as f:
+            f.write(f"\n=== JS File Debug {datetime.now()} ===\n")
+            f.write(f"Filename: {data.get('filename')}\n")
+            f.write(f"Size: {data.get('size')} bytes\n")
+            f.write(f"Type: {data.get('type')}\n")
+        return {'status': 'logged'}
+    except Exception as e:
+        return {'error': str(e)}

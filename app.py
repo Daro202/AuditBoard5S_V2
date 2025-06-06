@@ -31,8 +31,9 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 
 # Configure upload settings
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB max file size
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for uploads
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
