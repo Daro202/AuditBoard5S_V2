@@ -17,11 +17,19 @@ from cloudinary.utils import cloudinary_url
 # Register HEIF opener with Pillow
 pillow_heif.register_heif_opener()
 
-# Configure Cloudinary
+# Configure Cloudinary with debug logging
+cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
+api_key = os.environ.get('CLOUDINARY_API_KEY')
+api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+
+app.logger.info(f"Cloudinary config - Cloud name exists: {bool(cloud_name)}")
+app.logger.info(f"Cloudinary config - API key exists: {bool(api_key)}")
+app.logger.info(f"Cloudinary config - API secret exists: {bool(api_secret)}")
+
 cloudinary.config(
-    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
-    api_key=os.environ.get('CLOUDINARY_API_KEY'),
-    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    cloud_name=cloud_name,
+    api_key=api_key,
+    api_secret=api_secret,
     secure=True
 )
 
@@ -38,23 +46,18 @@ def log_all_requests():
         print(f"Files: {list(request.files.keys())}")
 
 def upload_to_cloudinary(file_obj, filename):
-    """Upload image to Cloudinary cloud storage"""
+    """Upload image to Cloudinary cloud storage with simplified config"""
     try:
         # Reset file pointer to beginning
         file_obj.seek(0)
         
-        # Upload to Cloudinary with folder organization
+        # Simplified upload without complex transformations
         result = cloudinary.uploader.upload(
             file_obj,
             folder="audit_photos",
-            public_id=f"audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            resource_type="image",
-            format="jpg",
-            quality="auto:good",
-            transformation=[
-                {"width": 1200, "height": 1200, "crop": "limit"},
-                {"quality": "auto:good"}
-            ]
+            use_filename=True,
+            unique_filename=True,
+            resource_type="auto"
         )
         
         app.logger.info(f"Successfully uploaded to Cloudinary: {result['secure_url']}")
@@ -62,6 +65,7 @@ def upload_to_cloudinary(file_obj, filename):
         
     except Exception as e:
         app.logger.error(f"Error uploading to Cloudinary: {str(e)}")
+        # Fallback: return None and handle gracefully
         return None
 
 def convert_heic_to_jpeg(file_obj, filename):

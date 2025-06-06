@@ -1,6 +1,10 @@
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
+import pytz
+
+# Define timezone for Poland
+poland_tz = pytz.timezone('Europe/Warsaw')
 
 class Machine(db.Model):
     """Model for machines that can be audited"""
