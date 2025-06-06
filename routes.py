@@ -14,6 +14,18 @@ import base64
 # Register HEIF opener with Pillow
 pillow_heif.register_heif_opener()
 
+# Global request interceptor to catch all POST requests
+@app.before_request
+def log_all_requests():
+    if request.method == 'POST':
+        app.logger.critical(f"POST REQUEST: {request.endpoint} - {request.url}")
+        app.logger.critical(f"Form keys: {list(request.form.keys())}")
+        app.logger.critical(f"Files keys: {list(request.files.keys())}")
+        print(f"=== POST REQUEST INTERCEPTED: {request.endpoint} ===")
+        print(f"URL: {request.url}")
+        print(f"Form: {list(request.form.keys())}")
+        print(f"Files: {list(request.files.keys())}")
+
 def convert_heic_to_jpeg(file_obj, filename):
     """Convert HEIC/HEIF file to JPEG format"""
     try:
