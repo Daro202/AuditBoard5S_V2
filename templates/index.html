@@ -201,15 +201,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusRadios = document.querySelectorAll('input[name="status"]');
     const descriptionLabel = document.getElementById('description-label');
     const descriptionTextarea = document.getElementById('description');
+    const actionCompletedSection = document.getElementById('action-completed-section');
     
     statusRadios.forEach(radio => {
         radio.addEventListener('change', function() {
             if (this.value === 'OK') {
                 descriptionLabel.textContent = 'Opis zgodności *';
                 descriptionTextarea.placeholder = 'Opisz potwierdzenie stanu OK...';
-            } else {
+                actionCompletedSection.style.display = 'none';
+            } else if (this.value === 'NOK') {
                 descriptionLabel.textContent = 'Opis problemu *';
                 descriptionTextarea.placeholder = 'Opisz wykrytą niezgodność...';
+                actionCompletedSection.style.display = 'block';
             }
         });
     });
