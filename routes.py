@@ -45,27 +45,58 @@ def log_all_requests():
         print(f"Form: {list(request.form.keys())}")
         print(f"Files: {list(request.files.keys())}")
 
-def upload_to_cloudinary(file_obj, filename):
-    """Upload image to Cloudinary cloud storage with simplified config"""
+def save_photo_locally(file_obj, filename):
+    """Save photo locally with proper error handling"""
     try:
+        # Ensure upload directory exists
+        upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Generate secure filename with timestamp
+        if filename:
+            secure_name = secure_filename(filename)
+            # Add Polish time timestamp
+            import pytz
+            from datetime import datetime
+            poland_tz = pytz.timezone('Europe/Warsaw')
+            timestamp = datetime.now(poland_tz).strftime('%Y%m%d_%H%M%S_')
+            final_filename = timestamp + secure_name
+        else:
+            # Fallback filename
+            import pytz
+            from datetime import datetime
+            poland_tz = pytz.timezone('Europe/Warsaw')
+            timestamp = datetime.now(poland_tz).strftime('%Y%m%d_%H%M%S')
+            final_filename = f"photo_{timestamp}.jpg"
+        
+        file_path = os.path.join(upload_dir, final_filename)
+        
         # Reset file pointer to beginning
         file_obj.seek(0)
         
-        # Simplified upload without complex transformations
-        result = cloudinary.uploader.upload(
-            file_obj,
-            folder="audit_photos",
-            use_filename=True,
-            unique_filename=True,
-            resource_type="auto"
-        )
+        # Save file
+        if hasattr(file_obj, 'save'):
+            # Flask FileStorage object
+            file_obj.save(file_path)
+        else:
+            # BytesIO object or similar
+            with open(file_path, 'wb') as f:
+                if hasattr(file_obj, 'read'):
+                    f.write(file_obj.read())
+                else:
+                    f.write(file_obj)
         
-        app.logger.info(f"Successfully uploaded to Cloudinary: {result['secure_url']}")
-        return result['secure_url']
-        
+        # Verify file was saved correctly
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            relative_path = f'uploads/{final_filename}'
+            app.logger.info(f"Photo saved locally: {relative_path}")
+            return relative_path
+        else:
+            app.logger.error("File was not saved properly")
+            return None
+            
     except Exception as e:
-        app.logger.error(f"Error uploading to Cloudinary: {str(e)}")
-        # Fallback: return None and handle gracefully
+        app.logger.error(f"Error saving photo locally: {str(e)}")
         return None
 
 def convert_heic_to_jpeg(file_obj, filename):
@@ -181,14 +212,14 @@ def submit_audit():
                         # Create BytesIO object for Cloudinary upload
                         image_buffer = io.BytesIO(image_data)
                         
-                        # Upload to Cloudinary
-                        cloudinary_url = upload_to_cloudinary(image_buffer, photo_filename)
+                        # Save photo locally with proper handling
+                        local_path = save_photo_locally(image_buffer, photo_filename)
                         
-                        if cloudinary_url:
-                            photo_path = cloudinary_url
-                            app.logger.info(f"Base64 photo uploaded to Cloudinary: {photo_path}")
+                        if local_path:
+                            photo_path = local_path
+                            app.logger.info(f"Base64 photo saved locally: {photo_path}")
                         else:
-                            app.logger.error("Failed to upload to Cloudinary")
+                            app.logger.error("Failed to save photo locally")
                     else:
                         app.logger.warning(f"File extension not allowed: {photo_filename}")
                 
@@ -224,16 +255,16 @@ def submit_audit():
                         original_filename = file.filename
                     
                     if allowed_file(original_filename):
-                        app.logger.info(f"Uploading regular file to Cloudinary: {original_filename}")
+                        app.logger.info(f"Saving regular file locally: {original_filename}")
                         
-                        # Upload to Cloudinary
-                        cloudinary_url = upload_to_cloudinary(file, original_filename)
+                        # Save photo locally
+                        local_path = save_photo_locally(file, original_filename)
                         
-                        if cloudinary_url:
-                            photo_path = cloudinary_url
-                            app.logger.info(f"Regular photo uploaded to Cloudinary: {photo_path}")
+                        if local_path:
+                            photo_path = local_path
+                            app.logger.info(f"Regular photo saved locally: {photo_path}")
                         else:
-                            app.logger.error("Failed to upload regular file to Cloudinary")
+                            app.logger.error("Failed to save regular file locally")
                     else:
                         app.logger.warning(f"File extension not allowed: {original_filename}")
                 else:
@@ -546,11 +577,11 @@ def submit_audit_mobile():
                 image_data = base64.b64decode(data)
                 image_buffer = io.BytesIO(image_data)
                 
-                # Upload to Cloudinary
-                cloudinary_url = upload_to_cloudinary(image_buffer, photo_filename)
-                if cloudinary_url:
-                    photo_path = cloudinary_url
-                    app.logger.info(f"Mobile photo uploaded to Cloudinary: {photo_path}")
+                # Save photo locally
+                local_path = save_photo_locally(image_buffer, photo_filename)
+                if local_path:
+                    photo_path = local_path
+                    app.logger.info(f"Mobile photo saved locally: {photo_path}")
             except Exception as e:
                 app.logger.error(f"Mobile photo upload error: {str(e)}")
         
@@ -588,13 +619,13 @@ def upload_cloudinary():
         if file.filename == '':
             return jsonify({'error': 'Nie wybrano pliku'}), 400
         
-        # Upload to Cloudinary
-        cloudinary_url = upload_to_cloudinary(file, file.filename)
+        # Save photo locally
+        local_path = save_photo_locally(file, file.filename)
         
-        if cloudinary_url:
-            return jsonify({'success': True, 'url': cloudinary_url})
+        if local_path:
+            return jsonify({'success': True, 'url': local_path})
         else:
-            return jsonify({'error': 'Błąd uploadowania'}), 500
+            return jsonify({'error': 'Błąd zapisywania'}), 500
             
     except Exception as e:
         app.logger.error(f"Direct upload error: {str(e)}")
