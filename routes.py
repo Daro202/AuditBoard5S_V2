@@ -10,158 +10,87 @@ from PIL import Image
 import pillow_heif
 import io
 import base64
-import cloudinary
-import cloudinary.uploader
-from cloudinary.utils import cloudinary_url
+import pytz
 
-# Register HEIF opener with Pillow
 pillow_heif.register_heif_opener()
 
-# Configure Cloudinary with debug logging
-cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
-api_key = os.environ.get('CLOUDINARY_API_KEY')
-api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'heic', 'heif'}
 
-app.logger.info(f"Cloudinary config - Cloud name exists: {bool(cloud_name)}")
-app.logger.info(f"Cloudinary config - API key exists: {bool(api_key)}")
-app.logger.info(f"Cloudinary config - API secret exists: {bool(api_secret)}")
-
-cloudinary.config(
-    cloud_name=cloud_name,
-    api_key=api_key,
-    api_secret=api_secret,
-    secure=True
-)
-
-# Global request interceptor to catch all POST requests
-@app.before_request
-def log_all_requests():
-    if request.method == 'POST':
-        app.logger.critical(f"POST REQUEST: {request.endpoint} - {request.url}")
-        app.logger.critical(f"Form keys: {list(request.form.keys())}")
-        app.logger.critical(f"Files keys: {list(request.files.keys())}")
-        print(f"=== POST REQUEST INTERCEPTED: {request.endpoint} ===")
-        print(f"URL: {request.url}")
-        print(f"Form: {list(request.form.keys())}")
-        print(f"Files: {list(request.files.keys())}")
-
-def upload_photo_with_fallback(file_obj, filename):
+def upload_photo_local(file_obj, filename=None):
     """
-    Upload photo with Cloudinary priority and local fallback
-    Returns: (photo_url, is_cloudinary_success)
+    Upload photo to local storage: static/uploads/audit_photos/
+    
+    Args:
+        file_obj: FileStorage from request.files["photo"] OR BytesIO object
+        filename: Optional filename (required if file_obj is BytesIO)
+    
+    Returns:
+        str: Relative path like 'uploads/audit_photos/20251125_101530_maszyna1.jpg'
+        None: If upload fails
     """
-    import pytz
-    from datetime import datetime
+    if not file_obj:
+        app.logger.error("No file provided")
+        return None
     
-    # Check if Cloudinary is configured
-    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
-    api_key = os.environ.get('CLOUDINARY_API_KEY')
-    api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+    if hasattr(file_obj, 'filename') and file_obj.filename:
+        filename = file_obj.filename
     
-    cloudinary_configured = all([cloud_name, api_key, api_secret])
+    if not filename:
+        app.logger.error("No filename provided")
+        return None
     
-    if cloudinary_configured:
-        # Try Cloudinary upload first
-        try:
-            file_obj.seek(0)
-            
-            app.logger.info(f"Attempting Cloudinary upload for: {filename}")
-            
-            # Upload to Cloudinary
-            result = cloudinary.uploader.upload(
-                file_obj,
-                folder="audit_photos",
-                use_filename=True,
-                unique_filename=True,
-                resource_type="auto",
-                transformation=[
-                    {"width": 1200, "height": 1200, "crop": "limit"},
-                    {"quality": "auto:good"}
-                ]
-            )
-            
-            cloudinary_url = result['secure_url']
-            app.logger.info(f"Successfully uploaded to Cloudinary: {cloudinary_url}")
-            return cloudinary_url, True
-            
-        except Exception as e:
-            app.logger.error(f"Cloudinary upload failed: {str(e)}")
-            app.logger.info("Falling back to local storage")
-    else:
-        app.logger.info("Cloudinary not configured, using local storage")
+    file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
     
-    # Fallback to local storage
+    if file_ext not in ALLOWED_EXTENSIONS:
+        app.logger.error(f"Invalid file extension: {file_ext}")
+        return None
+    
     try:
-        # Ensure upload directory exists
-        upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
-        os.makedirs(upload_dir, exist_ok=True)
+        poland_tz = pytz.timezone('Europe/Warsaw')
+        timestamp = datetime.now(poland_tz).strftime('%Y%m%d_%H%M%S')
         
-        # Generate secure filename with timestamp
-        if filename:
+        upload_subdir = os.path.join(app.config['UPLOAD_FOLDER'], 'audit_photos')
+        os.makedirs(upload_subdir, exist_ok=True)
+        
+        if file_ext in ['heic', 'heif']:
+            app.logger.info(f"Converting HEIC/HEIF to JPEG: {filename}")
+            image = Image.open(file_obj)
+            
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            
+            base_name = os.path.splitext(secure_filename(filename))[0]
+            final_filename = f"{timestamp}_{base_name}.jpg"
+            file_path = os.path.join(upload_subdir, final_filename)
+            image.save(file_path, format='JPEG', quality=85)
+            
+            relative_path = f"uploads/audit_photos/{final_filename}"
+            app.logger.info(f"HEIC converted and saved: {relative_path}")
+            return relative_path
+            
+        else:
             secure_name = secure_filename(filename)
-            # Add Polish time timestamp
-            poland_tz = pytz.timezone('Europe/Warsaw')
-            timestamp = datetime.now(poland_tz).strftime('%Y%m%d_%H%M%S_')
-            final_filename = timestamp + secure_name
-        else:
-            # Fallback filename
-            poland_tz = pytz.timezone('Europe/Warsaw')
-            timestamp = datetime.now(poland_tz).strftime('%Y%m%d_%H%M%S')
-            final_filename = f"photo_{timestamp}.jpg"
-        
-        file_path = os.path.join(upload_dir, final_filename)
-        
-        # Reset file pointer to beginning
-        file_obj.seek(0)
-        
-        # Save file
-        if hasattr(file_obj, 'save'):
-            # Flask FileStorage object
-            file_obj.save(file_path)
-        else:
-            # BytesIO object or similar
-            with open(file_path, 'wb') as f:
-                if hasattr(file_obj, 'read'):
-                    f.write(file_obj.read())
-                else:
-                    f.write(file_obj)
-        
-        # Verify file was saved correctly
-        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-            local_url = f"/static/uploads/{final_filename}"
-            app.logger.info(f"Photo saved locally: {local_url}")
-            return local_url, False
-        else:
-            app.logger.error("Local file was not saved properly")
-            return None, False
+            final_filename = f"{timestamp}_{secure_name}"
+            file_path = os.path.join(upload_subdir, final_filename)
+            
+            if hasattr(file_obj, 'save'):
+                file_obj.save(file_path)
+            else:
+                if hasattr(file_obj, 'seek'):
+                    file_obj.seek(0)
+                with open(file_path, 'wb') as f:
+                    if hasattr(file_obj, 'read'):
+                        f.write(file_obj.read())
+                    else:
+                        f.write(file_obj)
+            
+            relative_path = f"uploads/audit_photos/{final_filename}"
+            app.logger.info(f"Photo saved locally: {relative_path}")
+            return relative_path
             
     except Exception as e:
-        app.logger.error(f"Local storage also failed: {str(e)}")
-        return None, False
-
-def convert_heic_to_jpeg(file_obj, filename):
-    """Convert HEIC/HEIF file to JPEG format"""
-    try:
-        # Open HEIC file with Pillow
-        image = Image.open(file_obj)
-        
-        # Convert to RGB if necessary
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Create new filename with .jpg extension
-        base_name = os.path.splitext(filename)[0]
-        new_filename = f"{base_name}.jpg"
-        
-        # Save to bytes buffer
-        buffer = io.BytesIO()
-        image.save(buffer, format='JPEG', quality=85)
-        buffer.seek(0)
-        
-        return buffer, new_filename
-    except Exception as e:
-        app.logger.error(f"Error converting HEIC to JPEG: {str(e)}")
-        return None, None
+        app.logger.error(f"Failed to upload photo: {str(e)}")
+        return None
 
 @app.route('/')
 def index():
@@ -252,15 +181,13 @@ def submit_audit():
                         # Create BytesIO object for upload
                         image_buffer = io.BytesIO(image_data)
                         
-                        # Upload with Cloudinary priority and local fallback
-                        photo_url, is_cloudinary = upload_photo_with_fallback(image_buffer, photo_filename)
+                        # Upload to local storage
+                        photo_path = upload_photo_local(image_buffer, photo_filename)
                         
-                        if photo_url:
-                            photo_path = photo_url
-                            upload_method = "Cloudinary" if is_cloudinary else "local storage"
-                            app.logger.info(f"Base64 photo uploaded via {upload_method}: {photo_path}")
+                        if photo_path:
+                            app.logger.info(f"Base64 photo uploaded locally: {photo_path}")
                         else:
-                            app.logger.error("Failed to upload Base64 photo via both Cloudinary and local storage")
+                            app.logger.error("Failed to upload Base64 photo")
                     else:
                         app.logger.warning(f"File extension not allowed: {photo_filename}")
                 
@@ -277,38 +204,13 @@ def submit_audit():
                 if file and file.filename and file.filename != '':
                     app.logger.info(f"File details: name={file.filename}, type={file.content_type}")
                     
-                    # Check for HEIC/HEIF and convert
-                    is_heic = (file.filename.lower().endswith('.heic') or 
-                             file.filename.lower().endswith('.heif') or
-                             (file.content_type and file.content_type in ['image/heic', 'image/heif']))
+                    # Upload to local storage (HEIC conversion handled automatically)
+                    photo_path = upload_photo_local(file)
                     
-                    if is_heic:
-                        app.logger.info("Converting HEIC/HEIF file")
-                        converted_buffer, converted_filename = convert_heic_to_jpeg(file, file.filename)
-                        if converted_buffer and converted_filename:
-                            file = converted_buffer
-                            original_filename = converted_filename
-                            app.logger.info(f"Converted to: {converted_filename}")
-                        else:
-                            original_filename = file.filename
-                            app.logger.warning("HEIC conversion failed")
+                    if photo_path:
+                        app.logger.info(f"Photo uploaded locally: {photo_path}")
                     else:
-                        original_filename = file.filename
-                    
-                    if allowed_file(original_filename):
-                        app.logger.info(f"Uploading regular file: {original_filename}")
-                        
-                        # Upload with Cloudinary priority and local fallback
-                        photo_url, is_cloudinary = upload_photo_with_fallback(file, original_filename)
-                        
-                        if photo_url:
-                            photo_path = photo_url
-                            upload_method = "Cloudinary" if is_cloudinary else "local storage"
-                            app.logger.info(f"Regular photo uploaded via {upload_method}: {photo_path}")
-                        else:
-                            app.logger.error("Failed to upload regular file via both Cloudinary and local storage")
-                    else:
-                        app.logger.warning(f"File extension not allowed: {original_filename}")
+                        app.logger.error("Failed to upload file")
                 else:
                     app.logger.info("No valid file found")
             else:
@@ -619,12 +521,10 @@ def submit_audit_mobile():
                 image_data = base64.b64decode(data)
                 image_buffer = io.BytesIO(image_data)
                 
-                # Upload with Cloudinary priority and local fallback
-                photo_url, is_cloudinary = upload_photo_with_fallback(image_buffer, photo_filename)
-                if photo_url:
-                    photo_path = photo_url
-                    upload_method = "Cloudinary" if is_cloudinary else "local storage"
-                    app.logger.info(f"Mobile photo uploaded via {upload_method}: {photo_path}")
+                # Upload to local storage
+                photo_path = upload_photo_local(image_buffer, photo_filename)
+                if photo_path:
+                    app.logger.info(f"Mobile photo uploaded locally: {photo_path}")
             except Exception as e:
                 app.logger.error(f"Mobile photo upload error: {str(e)}")
         
@@ -662,14 +562,13 @@ def upload_cloudinary():
         if file.filename == '':
             return jsonify({'error': 'Nie wybrano pliku'}), 400
         
-        # Upload with Cloudinary priority and local fallback
-        photo_url, is_cloudinary = upload_photo_with_fallback(file, file.filename)
+        # Upload to local storage
+        photo_url = upload_photo_local(file)
         
         if photo_url:
-            upload_method = "Cloudinary" if is_cloudinary else "local storage"
-            return jsonify({'success': True, 'url': photo_url, 'method': upload_method})
+            return jsonify({'success': True, 'url': photo_url, 'method': 'local storage'})
         else:
-            return jsonify({'error': 'Błąd zapisywania przez oba sposoby'}), 500
+            return jsonify({'error': 'Błąd zapisywania pliku'}), 500
             
     except Exception as e:
         app.logger.error(f"Direct upload error: {str(e)}")
