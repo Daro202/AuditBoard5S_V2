@@ -1,11 +1,12 @@
 import os
 import random
-from flask import render_template, request, redirect, url_for, flash, jsonify
+from flask import render_template, request, redirect, url_for, flash, jsonify, send_file
 from werkzeug.utils import secure_filename
 from app import app, db
 from models import Machine, Question, Audit, AuditSession
 from utils import load_excel_data, allowed_file
 from datetime import datetime
+from openpyxl import Workbook
 from PIL import Image
 import pillow_heif
 import io
@@ -353,6 +354,43 @@ def upload_excel():
         flash(f'Wystąpił błąd podczas wczytywania pliku: {str(e)}', 'error')
     
     return redirect(url_for('index'))
+
+@app.route('/export_excel')
+def export_excel():
+    """Export machines and questions to Excel file"""
+    try:
+        wb = Workbook()
+        
+        ws_machines = wb.active
+        ws_machines.title = "Maszyny"
+        ws_machines.append(["Nazwa maszyny"])
+        
+        machines = Machine.query.order_by(Machine.id).all()
+        for machine in machines:
+            ws_machines.append([machine.name])
+        
+        ws_questions = wb.create_sheet("Pytania")
+        ws_questions.append(["Kod", "Opis"])
+        
+        questions = Question.query.order_by(Question.id).all()
+        for question in questions:
+            ws_questions.append([question.code, question.description])
+        
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='maszyny_pytania.xlsx'
+        )
+        
+    except Exception as e:
+        app.logger.error(f"Error exporting Excel: {str(e)}")
+        flash('Wystąpił błąd podczas eksportu.', 'error')
+        return redirect(url_for('index'))
 
 @app.route('/reset_session')
 def reset_session():
