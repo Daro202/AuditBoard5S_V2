@@ -198,7 +198,7 @@
 </div>
 
 <script>
-// Enhanced file selection handler for all mobile devices
+// Enhanced file selection handler
 function fileSelected(input) {
     const file = input.files[0];
     if (file) {
@@ -207,52 +207,8 @@ function fileSelected(input) {
         
         // Show file info
         const info = 'Plik: ' + file.name + '\nRozmiar: ' + (sizeMB > 0 ? sizeMB + 'MB' : sizeKB + 'KB') + '\nTyp: ' + file.type;
-        alert(info);
-        
-        // Convert to Base64 for ALL mobile devices (iOS, Android, etc.)
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile) {
-            convertToBase64(file);
-        }
+        console.log(info);
     }
-}
-
-// Convert file to Base64 for mobile compatibility
-function convertToBase64(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        // Create hidden input with Base64 data
-        let hiddenInput = document.getElementById('photo_base64');
-        if (!hiddenInput) {
-            hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = 'photo_base64';
-            hiddenInput.id = 'photo_base64';
-            document.querySelector('form[action="/submit_audit"]').appendChild(hiddenInput);
-        }
-        
-        // Also store filename
-        let filenameInput = document.getElementById('photo_filename');
-        if (!filenameInput) {
-            filenameInput = document.createElement('input');
-            filenameInput.type = 'hidden';
-            filenameInput.name = 'photo_filename';
-            filenameInput.id = 'photo_filename';
-            document.querySelector('form[action="/submit_audit"]').appendChild(filenameInput);
-        }
-        
-        hiddenInput.value = e.target.result;
-        filenameInput.value = file.name;
-        
-        alert('Zdjęcie przygotowane do wysłania (Base64)');
-        
-        // Clear the original file input to prevent conflicts
-        const photoInput = document.getElementById('photo');
-        if (photoInput) {
-            photoInput.value = '';
-        }
-    };
-    reader.readAsDataURL(file);
 }
 
 // Update form labels based on status selection
@@ -335,49 +291,27 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Assign submit handler to form
+    // Simple form validation - let browser handle standard submit
     if (auditForm) {
         auditForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            
             // Check required fields
             const status = this.querySelector('input[name="status"]:checked');
             const description = this.querySelector('textarea[name="description"]');
             
             if (!status) {
+                event.preventDefault();
                 alert('Wybierz status audytu (OK/NOK)');
-                return;
+                return false;
             }
             
             if (!description || !description.value.trim()) {
+                event.preventDefault();
                 alert('Wprowadź opis audytu');
-                return;
+                return false;
             }
             
-            // Show submission alert
-            alert('Zapisywanie audytu...');
-            
-            // Prepare form data
-            const formData = new FormData(this);
-            
-            // Always use standard submit_audit endpoint
-            fetch('/submit_audit', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    alert('Audyt zapisany pomyślnie!');
-                    window.location.href = '/';
-                } else {
-                    alert('Błąd podczas zapisywania audytu');
-                }
-            })
-            .catch(error => {
-                alert('Błąd sieci: ' + error.message);
-                // Fallback: try standard form submission
-                this.submit();
-            });
+            // Let the form submit normally (no fetch, no preventDefault)
+            console.log('Form submitting...');
         });
     }
 });
