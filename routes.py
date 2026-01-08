@@ -406,6 +406,47 @@ def reset_session():
     
     return redirect(url_for('index'))
 
+@app.route('/delete_all_audits', methods=['POST'])
+def delete_all_audits():
+    """Delete all audits after password verification"""
+    admin_password = request.form.get('admin_password', '')
+    correct_password = os.environ.get('ADMIN_PASSWORD', '4321')
+    
+    if admin_password != correct_password:
+        flash('Nieprawidłowe hasło.', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Delete all audit photos from disk
+        audits = Audit.query.all()
+        for audit in audits:
+            if audit.photo_path:
+                photo_full_path = os.path.join('static', audit.photo_path)
+                if os.path.exists(photo_full_path):
+                    try:
+                        os.remove(photo_full_path)
+                        app.logger.info(f"Deleted photo: {photo_full_path}")
+                    except Exception as e:
+                        app.logger.error(f"Error deleting photo {photo_full_path}: {e}")
+        
+        # Delete all audits from database
+        deleted_count = Audit.query.delete()
+        
+        # Reset sessions
+        AuditSession.query.delete()
+        _create_new_audit_session()
+        
+        db.session.commit()
+        flash(f'Usunięto {deleted_count} audytów i zresetowano sesję.', 'success')
+        app.logger.info(f"Deleted {deleted_count} audits and reset session")
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting audits: {str(e)}")
+        flash('Wystąpił błąd podczas usuwania audytów.', 'error')
+    
+    return redirect(url_for('index'))
+
 def _create_new_audit_session():
     """Create new audit session with all machine-question pairs"""
     machines = Machine.query.all()
