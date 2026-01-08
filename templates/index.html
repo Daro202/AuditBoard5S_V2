@@ -127,12 +127,40 @@
                             <div class="col-md-6">
                                 <!-- Photo upload -->
                                 <div class="mb-3">
-                                    <label for="photo" class="form-label">Zdjęcie dokumentujące</label>
-                                    <input type="file" class="form-control" id="photo" name="photo" 
-                                           accept="image/*,image/heic,image/heif" onchange="fileSelected(this)">
+                                    <label class="form-label">Zdjęcie dokumentujące</label>
+                                    
+                                    <!-- Mobile: Camera button (visible on mobile) -->
+                                    <div id="mobile-photo-section" class="d-none">
+                                        <div class="d-grid gap-2">
+                                            <button type="button" class="btn btn-outline-primary btn-lg" onclick="document.getElementById('photo-camera').click()">
+                                                <i class="fas fa-camera me-2"></i>
+                                                Zrób zdjęcie aparatem
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('photo-gallery').click()">
+                                                <i class="fas fa-images me-2"></i>
+                                                Wybierz z galerii
+                                            </button>
+                                        </div>
+                                        <input type="file" id="photo-camera" name="photo" 
+                                               accept="image/*" capture="environment" 
+                                               onchange="fileSelected(this)" class="d-none">
+                                        <input type="file" id="photo-gallery" name="photo" 
+                                               accept="image/*,image/heic,image/heif" 
+                                               onchange="fileSelected(this)" class="d-none">
+                                        <div id="mobile-photo-preview" class="mt-2 text-success d-none">
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            <span id="mobile-photo-name"></span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Desktop: Standard file input (visible on desktop) -->
+                                    <div id="desktop-photo-section">
+                                        <input type="file" class="form-control" id="photo" name="photo" 
+                                               accept="image/*,image/heic,image/heif" onchange="fileSelected(this)">
+                                    </div>
+                                    
                                     <div class="form-text">
-                                        Dozwolone formaty: JPG, PNG, GIF (max 32MB)<br>
-                                        Na telefonie: dotknij aby zrobić zdjęcie aparatem
+                                        Dozwolone formaty: JPG, PNG, GIF, HEIC (max 32MB)
                                     </div>
                                 </div>
                             </div>
@@ -202,6 +230,12 @@
 </div>
 
 <script>
+// Detect mobile device
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+           || (window.innerWidth <= 768);
+}
+
 // Enhanced file selection handler
 function fileSelected(input) {
     const file = input.files[0];
@@ -209,14 +243,75 @@ function fileSelected(input) {
         const sizeKB = Math.round(file.size/1024);
         const sizeMB = Math.round(file.size/1024/1024);
         
-        // Show file info
-        const info = 'Plik: ' + file.name + '\nRozmiar: ' + (sizeMB > 0 ? sizeMB + 'MB' : sizeKB + 'KB') + '\nTyp: ' + file.type;
-        console.log(info);
+        // Check file size
+        const maxSize = 32 * 1024 * 1024; // 32MB
+        if (file.size > maxSize) {
+            alert('Plik jest za duży. Maksymalny rozmiar to 32MB.');
+            input.value = '';
+            return;
+        }
+        
+        // Show mobile preview
+        const mobilePreview = document.getElementById('mobile-photo-preview');
+        const mobilePhotoName = document.getElementById('mobile-photo-name');
+        if (mobilePreview && mobilePhotoName && isMobileDevice()) {
+            mobilePhotoName.textContent = file.name + ' (' + (sizeMB > 0 ? sizeMB + 'MB' : sizeKB + 'KB') + ')';
+            mobilePreview.classList.remove('d-none');
+        }
+        
+        // Convert to Base64 for mobile
+        if (isMobileDevice()) {
+            convertToBase64(file);
+        }
+        
+        console.log('File selected:', file.name, file.size, file.type);
     }
+}
+
+// Convert file to Base64 for mobile compatibility
+function convertToBase64(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        let hiddenInput = document.getElementById('photo_base64');
+        if (!hiddenInput) {
+            hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'photo_base64';
+            hiddenInput.id = 'photo_base64';
+            document.querySelector('form[action="/submit_audit"]').appendChild(hiddenInput);
+        }
+        
+        let filenameInput = document.getElementById('photo_filename');
+        if (!filenameInput) {
+            filenameInput = document.createElement('input');
+            filenameInput.type = 'hidden';
+            filenameInput.name = 'photo_filename';
+            filenameInput.id = 'photo_filename';
+            document.querySelector('form[action="/submit_audit"]').appendChild(filenameInput);
+        }
+        
+        hiddenInput.value = e.target.result;
+        filenameInput.value = file.name;
+        console.log('Photo converted to Base64');
+    };
+    reader.readAsDataURL(file);
 }
 
 // Update form labels based on status selection
 document.addEventListener('DOMContentLoaded', function() {
+    // Show mobile or desktop photo section
+    const mobileSection = document.getElementById('mobile-photo-section');
+    const desktopSection = document.getElementById('desktop-photo-section');
+    
+    if (mobileSection && desktopSection) {
+        if (isMobileDevice()) {
+            mobileSection.classList.remove('d-none');
+            desktopSection.classList.add('d-none');
+        } else {
+            mobileSection.classList.add('d-none');
+            desktopSection.classList.remove('d-none');
+        }
+    }
     const statusRadios = document.querySelectorAll('input[name="status"]');
     const descriptionLabel = document.getElementById('description-label');
     const descriptionTextarea = document.getElementById('description');
@@ -236,69 +331,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Debug file upload
-    const photoInput = document.getElementById('photo');
-    if (photoInput) {
-        photoInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                console.log('File selected:', {
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                    lastModified: file.lastModified
-                });
-                
-                // Check file size
-                const maxSize = 32 * 1024 * 1024; // 32MB
-                if (file.size > maxSize) {
-                    alert('Plik jest za duży. Maksymalny rozmiar to 32MB.');
-                    e.target.value = '';
-                    return;
-                }
-                
-                // Simple alert for mobile debugging
-                alert('Plik wybrany: ' + file.name + ' (' + Math.round(file.size/1024) + 'KB)');
-            }
-        });
-    }
-    
-    // Debug form submission with alert for mobile debugging
+    // Form validation
     const auditForm = document.querySelector('form[action="/submit_audit"]');
     if (auditForm) {
-        auditForm.addEventListener('submit', function(e) {
-            const formData = new FormData(this);
-            const file = formData.get('photo');
-            const base64Data = formData.get('photo_base64');
-            const base64Filename = formData.get('photo_filename');
-            
-            // Show detailed debug info with alert for mobile
-            const debugInfo = 'Form submission debug:\n' +
-                'Has file: ' + (!!file) + '\n' +
-                'File name: ' + (file ? file.name : 'none') + '\n' +
-                'File size: ' + (file ? file.size : 0) + '\n' +
-                'Has Base64: ' + (!!base64Data) + '\n' +
-                'Base64 filename: ' + (base64Filename || 'none') + '\n' +
-                'Base64 size: ' + (base64Data ? base64Data.length : 0);
-            
-            alert(debugInfo);
-            
-            console.log('Form submission:', {
-                hasFile: !!file,
-                fileName: file ? file.name : 'none',
-                fileSize: file ? file.size : 0,
-                hasBase64: !!base64Data,
-                base64Filename: base64Filename,
-                base64Size: base64Data ? base64Data.length : 0,
-                formEntries: Array.from(formData.entries()).map(([k, v]) => [k, v instanceof File ? `File: ${v.name}` : v])
-            });
-        });
-    }
-    
-    // Simple form validation - let browser handle standard submit
-    if (auditForm) {
         auditForm.addEventListener('submit', function(event) {
-            // Check required fields
             const status = this.querySelector('input[name="status"]:checked');
             const description = this.querySelector('textarea[name="description"]');
             
@@ -313,9 +349,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Wprowadź opis audytu');
                 return false;
             }
-            
-            // Let the form submit normally (no fetch, no preventDefault)
-            console.log('Form submitting...');
         });
     }
 });
